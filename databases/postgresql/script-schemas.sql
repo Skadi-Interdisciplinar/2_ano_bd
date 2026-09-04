@@ -11,9 +11,17 @@ DROP TABLE IF EXISTS tb_produto CASCADE;
 DROP TABLE IF EXISTS tb_termometro CASCADE;
 DROP TABLE IF EXISTS tb_usuario CASCADE;
 DROP TABLE IF EXISTS tb_endereco CASCADE;
-DROP TABLE IF EXISTS tb_estado CASCADE;
 DROP TABLE IF EXISTS tb_cd CASCADE;
+DROP TABLE IF EXISTS tb_estado CASCADE;
 
+
+CREATE TABLE tb_estado (
+	id SERIAL,
+	estado CHAR(2) NOT NULL,
+
+	CONSTRAINT pk_estado PRIMARY KEY (id),
+	CONSTRAINT uq_estado_sigla UNIQUE (estado)
+);
 
 CREATE TABLE tb_cd (
 	id SERIAL,
@@ -24,17 +32,9 @@ CREATE TABLE tb_cd (
 	CONSTRAINT uq_cd_cnpj UNIQUE (cnpj)
 );
 
-CREATE TABLE tb_estado (
-	id SERIAL,
-	estado CHAR(2) NOT NULL,
-
-	CONSTRAINT pk_estado PRIMARY KEY (id),
-	CONSTRAINT uq_estado_sigla UNIQUE (estado)
-);
-
 CREATE TABLE tb_endereco (
 	id SERIAL,
-	cep VARCHAR(9) NOT NULL,
+	cep VARCHAR(8) NOT NULL,
 	rua VARCHAR(150) NOT NULL,
 	numero INTEGER NOT NULL,
 	cidade VARCHAR(60) NOT NULL,
@@ -114,7 +114,7 @@ CREATE TABLE tb_alerta (
 	cod_refrigerador INTEGER NOT NULL,
 	nivel_atual VARCHAR(8) NOT NULL DEFAULT 'operador',
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	tipo VARCHAR(100) NOT NULL,
+	tipo VARCHAR(100) NOT NULL DEFAULT 'temperatura_fora_padrao',
 	nivel_gravidade VARCHAR(100) NOT NULL,
 	status VARCHAR(100) NOT NULL,
 	canal VARCHAR(100) NOT NULL,
@@ -124,7 +124,8 @@ CREATE TABLE tb_alerta (
 	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('operador', 'gestor', 'admin')),
 	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('baixa', 'media', 'alta', 'critica')),
 	CONSTRAINT ck_alerta_status CHECK (status IN ('ativo', 'reconhecido', 'resolvido')),
-	CONSTRAINT ck_alerta_canal CHECK (canal IN ('SMS', 'Whatsapp', 'E-mail'))
+	CONSTRAINT ck_alerta_canal CHECK (canal IN ('SMS', 'Whatsapp', 'E-mail')),
+	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('temperatura_fora_padrao'))
 );
 
 CREATE TABLE tb_notificacao_alerta (
