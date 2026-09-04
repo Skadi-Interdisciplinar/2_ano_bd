@@ -8,9 +8,9 @@ DROP TRIGGER IF EXISTS trg_auditoria_alerta ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_log_escalonamento ON tb_alerta;
 
 
--- ==============================================
+-- =============================================
 -- TABELAS DE LOG
--- ==============================================
+-- =============================================
 CREATE TABLE tb_log_acesso (
 	id SERIAL,
 	cod_usuario INTEGER,
@@ -57,7 +57,7 @@ CREATE TABLE tb_log_escalonamento (
 	cod_alerta INTEGER NOT NULL,
 	nivel_anterior VARCHAR(8),
 	nivel_novo VARCHAR(8) NOT NULL,
-	motivo VARCHAR(50) NOT NULL,
+	motivo VARCHAR(50) NOT NULL DEFAULT 'tempo_limite_excedido',
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
 	CONSTRAINT pk_log_escalonamento PRIMARY KEY (id),
@@ -76,9 +76,9 @@ CREATE TABLE tb_log_sensor (
 );
 
 
--- ==============================================
+-- =============================================
 -- TRIGGERS DE AUDITORIA
--- ==============================================
+-- =============================================
 CREATE OR REPLACE FUNCTION fn_log_auditoria() 
 RETURNS TRIGGER AS $$
 DECLARE
@@ -122,8 +122,8 @@ CREATE OR REPLACE FUNCTION fn_log_escalonamento()
 RETURNS TRIGGER AS $$
 BEGIN
 	IF NEW.nivel_atual IS DISTINCT FROM OLD.nivel_atual THEN
-		INSERT INTO tb_log_escalonamento (cod_alerta, nivel_anterior, nivel_novo, motivo)
-		VALUES (NEW.id, OLD.nivel_atual, NEW.nivel_atual, 'tempo_limite_excedido');
+		INSERT INTO tb_log_escalonamento (cod_alerta, nivel_anterior, nivel_novo)
+		VALUES (NEW.id, OLD.nivel_atual, NEW.nivel_atual);
 	END IF;
 
 	RETURN NEW;
