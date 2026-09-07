@@ -2,6 +2,7 @@ DROP TRIGGER IF EXISTS trg_criar_atendimento_pendente ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_resolver_atendimento_por_justificativa ON tb_justificativa;
 DROP TRIGGER IF EXISTS trg_validar_temperatura_produto_refrigerador ON tb_produto_refrigerador;
 DROP TRIGGER IF EXISTS trg_gerar_alerta_por_leitura ON tb_leitura_temperatura;
+DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
 
 
 CREATE OR REPLACE FUNCTION fn_criar_atendimento_pendente() 
@@ -166,3 +167,26 @@ CREATE TRIGGER trg_gerar_alerta_por_leitura
 AFTER INSERT ON tb_leitura_temperatura
 FOR EACH ROW
 EXECUTE FUNCTION fn_gerar_alerta_por_leitura();
+
+
+CREATE OR REPLACE FUNCTION fn_notificar_novo_alerta()
+RETURNS TRIGGER AS $$
+DECLARE
+	v_horas_prazo DECIMAL(5,2);
+BEGIN
+	-- fn_calcular_prazo_escalonamento retorna uma fração de tempo_sobrevivencia
+	-- (assumido em HORAS — ajuste a unidade abaixo se for minutos/segundos)
+	v_horas_prazo := fn_calcular_prazo_escalonamento(NEW.id, 40); -- 40% para 1º escalonamento (operador -> gestor)
+ 
+	PERFORM pg_notify('novo_alerta', json_build_object(
+		'id_alerta', NEW.id,
+		'prazo_epoch', EXTRACT(EPOCH FROM (NEW.data_hora + v_horas_prazo * INTERVAL '1 hour') AT TIME ZONE 'America/Sao_Paulo')
+	)::text);
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+ 
+CREATE TRIGGER trg_notificar_novo_alerta
+AFTER INSERT ON tb_alerta
+FOR EACH ROW
+EXECUTE FUNCTION fn_notificar_novo_alerta();
