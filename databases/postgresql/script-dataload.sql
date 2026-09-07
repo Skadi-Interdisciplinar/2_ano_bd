@@ -71,6 +71,12 @@ ALTER TABLE tb_usuario
 DISABLE TRIGGER trg_auditoria_usuario;
 
 INSERT INTO tb_usuario (
+    nome, cpf, email, senha, nivel_acesso
+)
+VALUES 
+('Sistema Worker', '00000000000', 'sistema@skadi.local', '$2b$12$3wu4y3is8.AuPIIvwioO1eCs8ErbMEWRcmCEgONkpZwBufwtHYC7K', 'sistema');
+
+INSERT INTO tb_usuario (
     nome, cpf, email, senha, nivel_acesso, cod_cd
 )
 SELECT
@@ -414,7 +420,7 @@ BEGIN
     ORDER BY id DESC
     LIMIT 1;
 
-    CALL sp_registrar_atendimento(v_cod_alerta, 61);
+    CALL sp_registrar_atendimento(v_cod_alerta, 62);
 END $$;
  
 INSERT INTO tb_justificativa (
@@ -442,7 +448,7 @@ BEGIN
     ORDER BY id DESC
     LIMIT 1;
 
-    CALL sp_registrar_atendimento(v_cod_alerta, 41);
+    CALL sp_registrar_atendimento(v_cod_alerta, 42);
 END $$;
 
 
@@ -453,9 +459,9 @@ INSERT INTO tb_relatorio (
     cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status
 )
 VALUES
-(1, 'a1b2c3d4e5f67890123456789012345678901234567890123456789012345678', '2026-08-01', '2026-08-31', 'gerado'),
-(2, 'b2c3d4e5f678901234567890123456789012345678901234567890123456789', '2026-08-01', '2026-08-31', 'assinado'),
-(3, 'c3d4e5f6789012345678901234567890123456789012345678901234567890', '2026-07-01', '2026-07-31', 'arquivado');
+(2, 'a1b2c3d4e5f67890123456789012345678901234567890123456789012345678', '2026-08-01', '2026-08-31', 'gerado'),
+(3, 'b2c3d4e5f678901234567890123456789012345678901234567890123456789', '2026-08-01', '2026-08-31', 'assinado'),
+(4, 'c3d4e5f6789012345678901234567890123456789012345678901234567890', '2026-07-01', '2026-07-31', 'arquivado');
 
 
 -- =============================================
@@ -478,10 +484,10 @@ INSERT INTO tb_log_acesso_relatorio (
     cod_relatorio, cod_usuario, acao
 )
 VALUES
-    (1, 31, 'visualizou'),
-    (1, 32, 'baixou'),
-    (2, 32, 'visualizou'),
-    (3, 51, 'baixou');
+    (1, 32, 'visualizou'),
+    (1, 33, 'baixou'),
+    (2, 33, 'visualizou'),
+    (3, 52, 'baixou');
 
 
 -- Simulando escalonamento para gerar um log em tb_log_escalonamento
@@ -516,11 +522,11 @@ INSERT INTO tb_log_acesso (
     cod_usuario, tentativa_sucesso, ip_origem, user_agent, motivo_falha
 )
 VALUES
-	(1, TRUE, '192.168.1.10', 'Mozilla/5.0', NULL),
-	(31, TRUE, '192.168.1.11', 'Mozilla/5.0', NULL),
-	(32, TRUE, '192.168.1.12', 'Mozilla/5.0', NULL),
-	(51, TRUE, '192.168.1.13', 'Mozilla/5.0', NULL),
-	(41, FALSE, '192.168.1.14', 'Mozilla/5.0', 'Senha incorreta');
+	(2, TRUE, '192.168.1.10', 'Mozilla/5.0', NULL),
+	(32, TRUE, '192.168.1.11', 'Mozilla/5.0', NULL),
+	(33, TRUE, '192.168.1.12', 'Mozilla/5.0', NULL),
+	(52, TRUE, '192.168.1.13', 'Mozilla/5.0', NULL),
+	(42, FALSE, '192.168.1.14', 'Mozilla/5.0', 'Senha incorreta');
 
 
 COMMIT;
