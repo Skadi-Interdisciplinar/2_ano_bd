@@ -5,6 +5,7 @@ Camada relacional do **Skadi**, responsável pelo armazenamento e gerenciamento 
 ## Sumário
 
 * [Estrutura de arquivos](#estrutura-de-arquivos)
+* [Execução](#execução)
 * [Modelo de dados](#modelo-de-dados)
 * [Automações](#automações)
 * [Decisões de design](#decisões-de-design)
@@ -19,13 +20,26 @@ Camada relacional do **Skadi**, responsável pelo armazenamento e gerenciamento 
 
 | Arquivo                       | Responsabilidade                      |
 | ----------------------------- | ------------------------------------- |
-| `script-schemas.sql`          | Criação das tabelas do sistema        |
-| `script-catalogo-dados.sql`   | Catálogo de dados e colunas sensíveis |
-| `script-functions.sql`        | Funções de cálculo                    |
-| `script-procedures.sql`       | Procedures de operação                |
-| `script-triggers-negocio.sql` | Triggers das regras de negócio        |
-| `script-audit.sql`            | Auditoria, escalonamento e logs       |
-| `script-dataload.sql`         | Massa de dados para testes de volume  |
+| `schemas.sql`                 | Criação das tabelas do sistema        |
+| `catalogo-dados.sql`          | Catálogo de dados e colunas sensíveis |
+| `functions.sql`               | Funções de cálculo                    |
+| `procedures.sql`              | Procedures de operação                |
+| `triggers.sql`                | Triggers das regras de negócio        |
+| `audit.sql`                   | Auditoria, escalonamento e logs       |
+| `dataload.sql`                | Massa de dados para testes de volume  |
+| `deploy.sql`                  | Execução completa do banco            |
+
+---
+
+## Execução
+
+O `deploy.sql` é o ponto de entrada para a configuração do banco de dados PostgreSQL e executa os demais scripts necessários.
+
+Para configurar o banco, execute:
+
+```text
+deploy.sql
+```
 
 ---
 
