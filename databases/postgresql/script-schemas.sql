@@ -15,6 +15,9 @@ DROP TABLE IF EXISTS tb_cd CASCADE;
 DROP TABLE IF EXISTS tb_estado CASCADE;
 
 
+ALTER DATABASE skadi SET timezone TO 'America/Sao_Paulo';
+
+
 CREATE TABLE tb_estado (
 	id SERIAL,
 	estado CHAR(2) NOT NULL,
@@ -56,13 +59,13 @@ CREATE TABLE tb_usuario (
 	email VARCHAR(255) NOT NULL,
 	senha VARCHAR(255) NOT NULL,
 	nivel_acesso VARCHAR(8) NOT NULL DEFAULT 'operador',
-	cod_cd INTEGER NOT NULL,
+	cod_cd INTEGER,
 
 	CONSTRAINT pk_usuario PRIMARY KEY (id),
 	CONSTRAINT uq_usuario_cpf UNIQUE (cpf),
 	CONSTRAINT uq_usuario_email UNIQUE (email),
 	CONSTRAINT fk_usuario_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id),
-	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('admin', 'gestor', 'operador'))
+	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('admin', 'gestor', 'operador', 'sistema'))
 );
 
 CREATE TABLE tb_termometro (
