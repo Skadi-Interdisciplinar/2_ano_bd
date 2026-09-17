@@ -1,6 +1,6 @@
 DROP TRIGGER IF EXISTS trg_criar_atendimento_pendente ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_resolver_atendimento_por_justificativa ON tb_justificativa;
-DROP TRIGGER IF EXISTS trg_validar_temperatura_produto_refrigerador ON tb_produto_refrigerador;
+DROP TRIGGER IF EXISTS trg_validar_temperatura_categoria_refrigerador ON tb_lote_refrigerador;
 DROP TRIGGER IF EXISTS trg_gerar_alerta_por_leitura ON tb_leitura_temperatura;
 DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
 
@@ -46,36 +46,47 @@ AFTER INSERT ON tb_justificativa
 FOR EACH ROW EXECUTE FUNCTION fn_resolver_atendimento_por_justificativa();
 
 
-CREATE OR REPLACE FUNCTION fn_validar_temperatura_produto_refrigerador() 
+CREATE OR REPLACE FUNCTION fn_validar_temperatura_categoria_refrigerador()
 RETURNS TRIGGER AS $$
 DECLARE
-	v_temp_novo DECIMAL(5,2);
-	v_temp_existente DECIMAL(5,2);
+	v_temp_ideal DECIMAL(5,2);
+	v_temp_min DECIMAL(5,2);
+	v_temp_max DECIMAL(5,2);
 BEGIN
-	SELECT temperatura_ideal 
-	INTO v_temp_novo 
-	FROM tb_produto 
-	WHERE id = NEW.cod_produto;
+	SELECT c.temperatura_ideal, r.temperatura_min, r.temperatura_max
+	INTO v_temp_ideal, v_temp_min, v_temp_max
+	FROM tb_lote l
+	JOIN tb_categoria c 
+        ON c.id = l.cod_categoria
+	CROSS JOIN tb_refrigerador r
+	WHERE l.id = NEW.cod_lote AND r.id = NEW.cod_refrigerador;
 
-	SELECT p.temperatura_ideal 
-	INTO v_temp_existente
-	FROM tb_produto p
-	JOIN tb_produto_refrigerador pr 
-		ON pr.cod_produto = p.id
-	WHERE pr.cod_refrigerador = NEW.cod_refrigerador
-	LIMIT 1;
-
-	IF v_temp_existente IS NOT NULL AND v_temp_existente != v_temp_novo THEN
-		RAISE EXCEPTION 'Produto com temperatura ideal % incompatível com refrigerador (já há produto com temperatura %).', v_temp_novo, v_temp_existente;
+	IF v_temp_ideal IS NULL THEN
+		RAISE EXCEPTION 'Lote % ou refrigerador % não encontrado.', NEW.cod_lote, NEW.cod_refrigerador;
+	END IF;
+	IF EXISTS (
+		SELECT 1
+		FROM tb_lote_refrigerador lr
+		JOIN tb_lote lote_existente 
+            ON lote_existente.id = lr.cod_lote
+		WHERE lr.cod_refrigerador = NEW.cod_refrigerador
+            AND lr.data_saida IS NULL
+		    AND lr.cod_lote <> NEW.cod_lote
+		    AND lote_existente.cod_categoria <> (SELECT cod_categoria FROM tb_lote WHERE id = NEW.cod_lote)
+	) THEN
+		RAISE EXCEPTION 'O refrigerador % já possui lote ativo de outra categoria.', NEW.cod_refrigerador;
+	END IF;
+	IF v_temp_ideal < v_temp_min OR v_temp_ideal > v_temp_max THEN
+		RAISE EXCEPTION 'Temperatura ideal da categoria (%) incompatível com a faixa do refrigerador (% a %).', v_temp_ideal, v_temp_min, v_temp_max;
 	END IF;
 
 	RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_validar_temperatura_produto_refrigerador
-BEFORE INSERT ON tb_produto_refrigerador
-FOR EACH ROW EXECUTE FUNCTION fn_validar_temperatura_produto_refrigerador();
+CREATE TRIGGER trg_validar_temperatura_categoria_refrigerador
+BEFORE INSERT OR UPDATE ON tb_lote_refrigerador
+FOR EACH ROW EXECUTE FUNCTION fn_validar_temperatura_categoria_refrigerador();
 
 
 CREATE OR REPLACE FUNCTION fn_gerar_alerta_por_leitura()
@@ -97,7 +108,13 @@ BEGIN
         v_temperatura_min,
         v_temperatura_max
     FROM tb_refrigerador r
-    WHERE r.cod_termometro = NEW.cod_termometro;
+    JOIN tb_lote_refrigerador lr 
+        ON lr.cod_refrigerador = r.id AND lr.data_saida IS NULL
+    JOIN tb_lote l 
+        ON l.id = lr.cod_lote AND l.status = 'ativo'
+    WHERE r.cod_termometro = NEW.cod_termometro
+    ORDER BY l.data_validade
+    LIMIT 1;
 
 	IF v_refrigerador IS NULL THEN
         RAISE EXCEPTION 'Termômetro % não está associado a nenhum refrigerador.', NEW.cod_termometro;
@@ -174,8 +191,7 @@ RETURNS TRIGGER AS $$
 DECLARE
 	v_horas_prazo DECIMAL(5,2);
 BEGIN
-	-- fn_calcular_prazo_escalonamento retorna uma fração de tempo_sobrevivencia
-	-- (assumido em HORAS — ajuste a unidade abaixo se for minutos/segundos)
+	-- A vida útil da categoria é expressa em horas.
 	v_horas_prazo := fn_calcular_prazo_escalonamento(NEW.id, 40); -- 40% para 1º escalonamento (operador -> gestor)
  
 	PERFORM pg_notify('novo_alerta', json_build_object(
