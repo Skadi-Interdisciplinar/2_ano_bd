@@ -2,41 +2,32 @@ CREATE OR REPLACE FUNCTION fn_calcular_prazo_escalonamento(
     p_cod_alerta INTEGER,
     p_percentual INTEGER
 )
-RETURNS DECIMAL(5,2) AS $$
+RETURNS DECIMAL(7,2) AS $$
 DECLARE
-    v_tempo_sobrevivencia DECIMAL(5,2);
-    v_resultado DECIMAL(5,2);
+    v_vida_util DECIMAL(7,2);
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM tb_alerta
-        WHERE id = p_cod_alerta
-    ) THEN
-        RAISE EXCEPTION 'Alerta % não encontrado.', p_cod_alerta;
-    END IF;
-
     IF p_percentual < 0 OR p_percentual > 100 THEN
         RAISE EXCEPTION 'Percentual de escalonamento inválido. O valor deve estar entre 0 e 100.';
     END IF;
 
-    SELECT MIN(p.tempo_sobrevivencia)
-    INTO v_tempo_sobrevivencia
-    FROM tb_produto p
-    JOIN tb_produto_refrigerador pr 
-        ON p.id = pr.cod_produto
-    JOIN tb_refrigerador r 
-        ON pr.cod_refrigerador = r.id
-    JOIN tb_alerta a 
-        ON r.id = a.cod_refrigerador
-    WHERE a.id = p_cod_alerta;
+    SELECT c.vida_util_horas
+    INTO v_vida_util
+    FROM tb_alerta a
+    JOIN tb_lote_refrigerador lr 
+        ON lr.cod_refrigerador = a.cod_refrigerador AND lr.data_saida IS NULL
+    JOIN tb_lote l 
+        ON l.id = lr.cod_lote
+    JOIN tb_categoria c 
+        ON c.id = l.cod_categoria
+    WHERE a.id = p_cod_alerta
+    ORDER BY l.data_validade
+    LIMIT 1;
 
-    IF v_tempo_sobrevivencia IS NULL THEN
-        RAISE EXCEPTION 'Nenhum produto associado ao refrigerador do alerta %.', p_cod_alerta;
+    IF v_vida_util IS NULL THEN
+        RAISE EXCEPTION 'Alerta % não possui lote/categoria válidos.', p_cod_alerta;
     END IF;
 
-    v_resultado := v_tempo_sobrevivencia * p_percentual / 100;
-
-    RETURN v_resultado;
+    RETURN v_vida_util * p_percentual / 100;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -58,20 +49,23 @@ BEGIN
         RAISE EXCEPTION 'Leitura de temperatura % não encontrada.', p_cod_leitura;
     END IF;
 
-    SELECT lt.temperatura, MIN(p.temperatura_ideal)
+    SELECT lt.temperatura, c.temperatura_ideal
     INTO v_temperatura_atual, v_temperatura_ideal
-    FROM tb_produto p
-    JOIN tb_produto_refrigerador pr 
-        ON p.id = pr.cod_produto
-    JOIN tb_refrigerador r 
-        ON pr.cod_refrigerador = r.id
+    FROM tb_refrigerador r
+    JOIN tb_lote_refrigerador lr 
+        ON lr.cod_refrigerador = r.id AND lr.data_saida IS NULL
+    JOIN tb_lote l 
+        ON l.id = lr.cod_lote AND l.status = 'ativo'
+    JOIN tb_categoria c 
+        ON c.id = l.cod_categoria
     JOIN tb_leitura_temperatura lt 
         ON r.cod_termometro = lt.cod_termometro
     WHERE lt.id = p_cod_leitura
-    GROUP BY lt.temperatura;
+    ORDER BY l.data_validade
+    LIMIT 1;
 
     IF v_temperatura_ideal IS NULL THEN
-        RAISE EXCEPTION 'Nenhum produto associado ao refrigerador da leitura %.', p_cod_leitura;
+        RAISE EXCEPTION 'Nenhum lote ativo associado ao refrigerador da leitura %.', p_cod_leitura;
     END IF;
 
     v_diferenca := ABS(v_temperatura_atual - v_temperatura_ideal);
