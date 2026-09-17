@@ -47,7 +47,7 @@ deploy.sql
 
 ### Cadastro
 
-`tb_estado` · `tb_cd` · `tb_endereco` · `tb_usuario` · `tb_termometro` · `tb_produto` · `tb_refrigerador` · `tb_produto_refrigerador`
+`tb_estado` · `tb_cd` · `tb_endereco` · `tb_usuario` · `tb_termometro` · `tb_categoria` · `tb_refrigerador` · `tb_lote` · `tb_lote_refrigerador`
 
 ### Monitoramento e alertas
 
@@ -81,7 +81,7 @@ leitura inserida
   → notifica usuários 'operador'
 ```
 
-A gravidade é calculada pela diferença absoluta entre a temperatura registrada e a temperatura ideal do produto.
+A gravidade é calculada pela diferença absoluta entre a temperatura registrada e a temperatura ideal da categoria do lote afetado.
 
 ### Resolução
 
@@ -107,15 +107,13 @@ Os campos possuem responsabilidades diferentes:
 
 O `nivel_atual` pode mudar durante o escalonamento sem alterar o status do alerta.
 
-### Múltiplos produtos
+### Lotes e categorias
 
-Quando um refrigerador possui vários produtos, `tb_produto.tempo_sobrevivencia` utiliza `MIN()`, considerando o menor tempo de sobrevivência.
+Cada lote pertence a uma única categoria. A tabela `tb_lote_refrigerador` registra a localização atual e o histórico de movimentações do lote entre refrigeradores.
 
-### Temperatura ideal
+`tb_categoria` concentra os parâmetros comuns aos lotes: temperatura ideal e vida útil em horas. A validade real fica registrada diretamente em cada lote, e a vida útil da categoria é usada no prazo de escalonamento dos alertas.
 
-Produtos associados ao mesmo refrigerador devem possuir a mesma `temperatura_ideal`.
-
-Essa regra é validada pelo trigger `trg_validar_temperatura_produto_refrigerador`.
+O trigger `trg_validar_temperatura_categoria_refrigerador` impede que um lote seja colocado em um refrigerador cuja faixa não comporte a temperatura ideal da categoria e impede categorias diferentes na mesma câmara.
 
 ### Atendimento pendente
 
@@ -146,9 +144,9 @@ Os triggers são responsáveis por automatizar regras importantes do fluxo de ne
 
 O trigger relacionado às leituras de temperatura verifica automaticamente se a leitura está fora dos parâmetros definidos. Quando necessário, ele aciona a geração do alerta e o fluxo de atendimento.
 
-### Validação de produtos
+### Validação de lotes
 
-`trg_validar_temperatura_produto_refrigerador` garante que os produtos associados ao mesmo refrigerador possuam a mesma `temperatura_ideal`.
+`trg_validar_temperatura_categoria_refrigerador` valida a compatibilidade entre a categoria do lote e a faixa de temperatura do refrigerador.
 
 ### Resolução
 
