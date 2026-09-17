@@ -5,6 +5,9 @@ DROP TABLE IF EXISTS tb_atendimento CASCADE;
 DROP TABLE IF EXISTS tb_leitura_temperatura CASCADE;
 DROP TABLE IF EXISTS tb_notificacao_alerta CASCADE;
 DROP TABLE IF EXISTS tb_alerta CASCADE;
+DROP TABLE IF EXISTS tb_lote_refrigerador CASCADE;
+DROP TABLE IF EXISTS tb_lote CASCADE;
+DROP TABLE IF EXISTS tb_categoria CASCADE;
 DROP TABLE IF EXISTS tb_produto_refrigerador CASCADE;
 DROP TABLE IF EXISTS tb_refrigerador CASCADE;
 DROP TABLE IF EXISTS tb_produto CASCADE;
@@ -75,15 +78,15 @@ CREATE TABLE tb_termometro (
 	CONSTRAINT pk_termometro PRIMARY KEY (id)
 );
 
-CREATE TABLE tb_produto (
+CREATE TABLE tb_categoria (
 	id SERIAL,
 	nome VARCHAR(150) NOT NULL,
 	temperatura_ideal DECIMAL(5,2) NOT NULL,
-	tempo_sobrevivencia DECIMAL(5,2) NOT NULL,
-	validade DATE NOT NULL,
+	vida_util_horas DECIMAL(7,2) NOT NULL,
 
-	CONSTRAINT pk_produto PRIMARY KEY (id),
-	CONSTRAINT uq_produto_nome UNIQUE (nome)
+	CONSTRAINT pk_categoria PRIMARY KEY (id),
+	CONSTRAINT uq_categoria_nome UNIQUE (nome),
+	CONSTRAINT ck_categoria_vida_util CHECK (vida_util_horas > 0)
 );
 
 CREATE TABLE tb_refrigerador (
@@ -101,15 +104,32 @@ CREATE TABLE tb_refrigerador (
 	CONSTRAINT uq_refrigerador_termometro UNIQUE (cod_termometro)
 );
 
-CREATE TABLE tb_produto_refrigerador (
+CREATE TABLE tb_lote (
 	id SERIAL,
-	cod_produto INTEGER NOT NULL,
-	cod_refrigerador INTEGER NOT NULL,
+	codigo_lote VARCHAR(50) NOT NULL,
+	cod_categoria INTEGER NOT NULL,
+	data_fabricacao DATE NOT NULL,
+	data_validade DATE NOT NULL,
+	status VARCHAR(20) NOT NULL DEFAULT 'ativo',
 
-	CONSTRAINT pk_produto_refrigerador PRIMARY KEY (id),
-	CONSTRAINT fk_produtoref_produto FOREIGN KEY (cod_produto) REFERENCES tb_produto(id),
-	CONSTRAINT fk_produtoref_refrigerador FOREIGN KEY (cod_refrigerador) REFERENCES tb_refrigerador(id),
-	CONSTRAINT uq_produto_refrigerador UNIQUE (cod_produto, cod_refrigerador)
+	CONSTRAINT pk_lote PRIMARY KEY (id),
+	CONSTRAINT uq_lote_codigo UNIQUE (codigo_lote),
+	CONSTRAINT fk_lote_categoria FOREIGN KEY (cod_categoria) REFERENCES tb_categoria(id),
+	CONSTRAINT ck_lote_datas CHECK (data_validade >= data_fabricacao),
+	CONSTRAINT ck_lote_status CHECK (status IN ('ativo', 'bloqueado', 'expedido', 'vencido'))
+);
+
+CREATE TABLE tb_lote_refrigerador (
+	id SERIAL,
+	cod_lote INTEGER NOT NULL,
+	cod_refrigerador INTEGER NOT NULL,
+	data_entrada TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	data_saida TIMESTAMP,
+
+	CONSTRAINT pk_lote_refrigerador PRIMARY KEY (id),
+	CONSTRAINT fk_loteref_lote FOREIGN KEY (cod_lote) REFERENCES tb_lote(id),
+	CONSTRAINT fk_loteref_refrigerador FOREIGN KEY (cod_refrigerador) REFERENCES tb_refrigerador(id),
+	CONSTRAINT ck_loteref_periodo CHECK (data_saida IS NULL OR data_saida > data_entrada)
 );
 
 CREATE TABLE tb_alerta (
