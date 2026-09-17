@@ -114,50 +114,17 @@ FROM generate_series(1, 50) AS gs;
 
 
 -- =============================================
--- 6. PRODUTOS
+-- 6. CATEGORIAS
 -- =============================================
-INSERT INTO tb_produto
-    (nome, temperatura_ideal, tempo_sobrevivencia, validade)
+INSERT INTO tb_categoria
+    (nome, temperatura_ideal, vida_util_horas)
 VALUES
-
--- Carnes bovinas — 4°C
-('Carne bovina - Acém', 4.00, 8.00, '2027-03-15'),
-('Carne bovina - Alcatra', 4.00, 8.00, '2027-03-20'),
-('Carne bovina - Contrafilé', 4.00, 8.00, '2027-04-10'),
-('Carne bovina - Costela', 4.00, 7.00, '2027-04-15'),
-('Carne bovina - Patinho', 4.00, 8.00, '2027-05-05'),
-
--- Carnes suínas — 4°C
-('Carne suína - Lombo', 4.00, 7.00, '2027-03-25'),
-('Carne suína - Pernil', 4.00, 7.00, '2027-04-05'),
-('Carne suína - Costela', 4.00, 6.00, '2027-04-20'),
-('Carne suína - Paleta', 4.00, 7.00, '2027-05-10'),
-
--- Aves — 4°C
-('Frango inteiro', 4.00, 6.00, '2027-02-15'),
-('Peito de frango', 4.00, 6.00, '2027-02-20'),
-('Coxa de frango', 4.00, 6.00, '2027-03-01'),
-('Asa de frango', 4.00, 5.00, '2027-03-10'),
-('Frango desossado', 4.00, 6.00, '2027-03-20'),
-
--- Carnes processadas — 4°C
-('Linguiça fresca', 4.00, 5.00, '2027-02-28'),
-('Hambúrguer bovino resfriado', 4.00, 5.00, '2027-03-15'),
-('Carne moída bovina', 4.00, 4.00, '2027-03-05'),
-
--- Pescados — 0°C
-('Tilápia fresca', 0.00, 4.00, '2027-02-10'),
-('Salmão fresco', 0.00, 4.00, '2027-02-15'),
-('Filé de peixe', 0.00, 4.00, '2027-03-01'),
-('Camarão fresco', 0.00, 3.00, '2027-03-10'),
-('Atum fresco', 0.00, 4.00, '2027-03-20'),
-
--- Produtos congelados — -18°C
-('Carne bovina congelada', -18.00, 4.00, '2028-01-15'),
-('Carne suína congelada', -18.00, 4.00, '2028-02-10'),
-('Frango congelado', -18.00, 4.00, '2028-02-20'),
-('Peixe congelado', -18.00, 3.00, '2028-03-05'),
-('Costela bovina congelada', -18.00, 4.00, '2028-03-15');
+('Carnes bovinas resfriadas', 4.00, 8.00),
+('Carnes suínas resfriadas', 4.00, 7.00),
+('Aves resfriadas', 4.00, 6.00),
+('Carnes processadas resfriadas', 4.00, 5.00),
+('Pescados frescos', 0.00, 4.00),
+('Pescados congelados', -18.00, 4.00);
 
 
 -- =============================================
@@ -187,82 +154,26 @@ VALUES
 
 
 -- =============================================
--- 8. PRODUTO x REFRIGERADOR
+-- 8. LOTES
 -- =============================================
-INSERT INTO tb_produto_refrigerador
-    (cod_produto, cod_refrigerador)
+INSERT INTO tb_lote
+    (codigo_lote, cod_categoria, data_fabricacao, data_validade)
 VALUES
+('LOTE-2026-0001', 1, '2026-08-20', '2026-09-04'),
+('LOTE-2026-0002', 2, '2026-08-21', '2026-09-05'),
+('LOTE-2026-0003', 3, '2026-08-22', '2026-09-03'),
+('LOTE-2026-0004', 4, '2026-08-23', '2026-09-02'),
+('LOTE-2026-0005', 1, '2026-08-20', '2026-09-04'),
+('LOTE-2026-0006', 2, '2026-08-21', '2026-09-05'),
+('LOTE-2026-0007', 5, '2026-08-25', '2026-09-01'),
+('LOTE-2026-0008', 5, '2026-08-26', '2026-09-02'),
+('LOTE-2026-0009', 5, '2026-08-27', '2026-09-03'),
+('LOTE-2026-0010', 6, '2026-08-01', '2027-08-01'),
+('LOTE-2026-0011', 6, '2026-08-02', '2027-08-02'),
+('LOTE-2026-0012', 6, '2026-08-03', '2027-08-03');
 
--- =========================
--- CARNES E AVES — 4°C
--- =========================
-
--- Refrigerador 1
-(1, 1),
-(2, 1),
-(3, 1),
-(4, 1),
-(5, 1),
-
--- Refrigerador 2
-(6, 2),
-(7, 2),
-(8, 2),
-(9, 2),
-(10, 2),
-
--- Refrigerador 3
-(11, 3),
-(12, 3),
-(13, 3),
-(14, 3),
-
--- Refrigerador 4
-(15, 4),
-(16, 4),
-(17, 4),
-
--- Refrigerador 5
-(1, 5),
-(6, 5),
-(11, 5),
-(15, 5),
-
--- Refrigerador 6
-(2, 6),
-(7, 6),
-(12, 6),
-(16, 6),
-
--- =========================
--- PESCADOS — 0°C
--- =========================
-
--- Refrigerador 7
-(18, 7),
-(19, 7),
-
--- Refrigerador 8
-(20, 8),
-(21, 8),
-
--- Refrigerador 9
-(22, 9),
-
--- =========================
--- CONGELADOS — -18°C
--- =========================
-
--- Refrigerador 10
-(23, 10),
-(24, 10),
-
--- Refrigerador 11
-(25, 11),
-(26, 11),
-
--- Refrigerador 12
-(27, 12);
+INSERT INTO tb_lote_refrigerador (cod_lote, cod_refrigerador)
+SELECT id, id FROM tb_lote;
 
 
 -- =============================================
