@@ -53,17 +53,23 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_usuario', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o funcionário pertence', 'Referencia tb_cd(id)', 'operador', FALSE),
  
 -- ==============================================
--- tb_produto
+-- tb_categoria
 -- ==============================================
-('tb_produto', 'nome', 'VARCHAR(150)', TRUE, 'NK', 'Nome do produto', 'Único no sistema', 'operador', FALSE),
-('tb_produto', 'tempo_sobrevivencia', 'DECIMAL(5,2)', TRUE, NULL, 'Tempo (em horas) que o produto resiste fora da temperatura ideal', 'Base do cálculo de escalonamento (40% do valor escala para gestor, 70% para admin). Quando um refrigerador tem múltiplos produtos, usa-se o MENOR valor entre eles', 'operador', FALSE),
-('tb_produto', 'temperatura_ideal', 'DECIMAL(5,2)', TRUE, NULL, 'Temperatura ideal de conservação do produto', 'Produtos no mesmo refrigerador devem ter a mesma temperatura ideal (validado por trigger)', 'operador', FALSE),
+('tb_categoria', 'nome', 'VARCHAR(150)', TRUE, 'NK', 'Categoria de armazenamento', 'Única no sistema; concentra os parâmetros comuns aos lotes', 'operador', FALSE),
+('tb_categoria', 'temperatura_ideal', 'DECIMAL(5,2)', TRUE, NULL, 'Temperatura ideal da categoria', 'Usada para calcular a gravidade dos alertas', 'operador', FALSE),
+('tb_categoria', 'vida_util_horas', 'DECIMAL(7,2)', TRUE, NULL, 'Vida útil da categoria em horas', 'Base direta do escalonamento do alerta', 'operador', FALSE),
  
 -- ==============================================
--- tb_produto_refrigerador
+-- tb_lote
 -- ==============================================
-('tb_produto_refrigerador', 'cod_produto', 'INTEGER', TRUE, 'FK', 'Produto associado ao refrigerador', 'Relação N:N — um refrigerador pode ter vários produtos, desde que com a mesma temperatura ideal', 'operador', FALSE),
-('tb_produto_refrigerador', 'cod_refrigerador', 'INTEGER', TRUE, 'FK', 'Refrigerador associado ao produto', 'Par (cod_produto, cod_refrigerador) é único — não permite duplicata', 'operador', FALSE),
+('tb_lote', 'codigo_lote', 'VARCHAR(50)', TRUE, 'NK', 'Identificador operacional do lote', 'Único no sistema', 'operador', FALSE),
+('tb_lote', 'cod_categoria', 'INTEGER', TRUE, 'FK', 'Categoria do lote', 'Cada lote pertence a exatamente uma categoria', 'operador', FALSE),
+('tb_lote', 'data_fabricacao', 'DATE', TRUE, NULL, 'Data de fabricação do lote', 'Usada para rastreabilidade', 'operador', FALSE),
+('tb_lote', 'data_validade', 'DATE', TRUE, NULL, 'Data de validade do lote', 'Deve ser igual ou posterior à fabricação', 'operador', FALSE),
+('tb_lote_refrigerador', 'cod_lote', 'INTEGER', TRUE, 'FK', 'Lote movimentado', 'Um lote pode passar por vários refrigeradores ao longo do tempo', 'operador', FALSE),
+('tb_lote_refrigerador', 'cod_refrigerador', 'INTEGER', TRUE, 'FK', 'Refrigerador do lote', 'Apenas uma localização atual pode ficar aberta por lote', 'operador', FALSE),
+('tb_lote_refrigerador', 'data_entrada', 'TIMESTAMP', TRUE, NULL, 'Entrada do lote no refrigerador', 'Início do período de armazenamento', 'operador', FALSE),
+('tb_lote_refrigerador', 'data_saida', 'TIMESTAMP', FALSE, NULL, 'Saída do lote do refrigerador', 'NULL indica a localização atual', 'operador', FALSE),
  
 -- ==============================================
 -- tb_refrigerador
@@ -83,7 +89,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_atendimento', 'cod_usuario', 'INTEGER', FALSE, 'FK', 'Funcionário responsável pelo atendimento', 'Aceita NULL: atendimento nasce pendente (via trigger), sem usuário atribuído até alguém reconhecer o alerta', 'operador', FALSE),
 ('tb_atendimento', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do atendimento', 'pendente -> em_andamento -> resolvido; transições controladas por sp_registrar_atendimento e trigger de justificativa', 'operador', FALSE),
 ('tb_atendimento', 'data_hora_reconhecimento', 'TIMESTAMP', FALSE, NULL, 'Momento em que alguém assumiu o alerta', 'Diferente de data_hora_resolucao: reconhecimento é "estou ciente", resolução é "problema resolvido de fato"', 'operador', FALSE),
-('tb_atendimento', 'data_hora_resolucao', 'TIMESTAMP', FALSE, NULL, 'Momento em que o atendimento foi finalizado', 'Métrica de HACCP: mede quanto tempo o produto ficou de fato em risco, não só sem monitoramento', 'operador', FALSE),
+('tb_atendimento', 'data_hora_resolucao', 'TIMESTAMP', FALSE, NULL, 'Momento em que o atendimento foi finalizado', 'Métrica de HACCP: mede quanto tempo o lote ficou de fato em risco, não só sem monitoramento', 'operador', FALSE),
  
 -- ==============================================
 -- tb_justificativa
