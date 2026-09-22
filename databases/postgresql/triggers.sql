@@ -56,7 +56,7 @@ BEGIN
 
     IF fn_camara_temperatura_normal(
         v_cod_camara,
-        CURRENT_TIMESTAMP
+        CURRENT_TIMESTAMP::TIMESTAMP
     ) THEN
 
         UPDATE tb_atendimento
