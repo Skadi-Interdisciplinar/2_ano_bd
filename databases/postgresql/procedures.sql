@@ -99,3 +99,91 @@ BEGIN
     END LOOP;
 END;
 $$;
+
+
+CREATE OR REPLACE PROCEDURE sp_cadastrar_usuario(
+    p_nome VARCHAR(150),
+    p_username VARCHAR(50),
+    p_cpf VARCHAR(11),
+    p_email VARCHAR(255),
+    p_senha VARCHAR(255),
+    p_nivel_acesso VARCHAR(8),
+    p_cod_cd INTEGER,
+    p_cod_gestor INTEGER DEFAULT NULL
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+    v_cod_executor INTEGER;
+    v_nivel_executor VARCHAR(8);
+    v_cd_executor INTEGER;
+    v_usuario_atual TEXT;
+BEGIN
+    v_usuario_atual := current_setting('app.usuario_atual', true);
+
+    IF v_usuario_atual IS NULL OR v_usuario_atual = '' THEN
+        RAISE EXCEPTION 'Usuário executor não informado.';
+    END IF;
+
+    BEGIN
+        v_cod_executor := v_usuario_atual::INTEGER;
+    EXCEPTION WHEN invalid_text_representation THEN
+        RAISE EXCEPTION 'app.usuario_atual deve conter um ID inteiro.';
+    END;
+
+    SELECT u.nivel_acesso, u.cod_cd
+    INTO v_nivel_executor, v_cd_executor
+    FROM tb_usuario u
+    WHERE u.id = v_cod_executor;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Usuário executor % não encontrado.', v_cod_executor;
+    END IF;
+
+    IF p_nivel_acesso NOT IN ('operador', 'gestor', 'admin') THEN
+        RAISE EXCEPTION 'Nível de acesso inválido para cadastro: %.', p_nivel_acesso;
+    END IF;
+
+    IF p_cod_cd IS NULL THEN
+        RAISE EXCEPTION 'O CD do novo usuário é obrigatório.';
+    END IF;
+
+    IF v_nivel_executor = 'admin' THEN
+        IF v_cd_executor IS DISTINCT FROM p_cod_cd THEN
+            RAISE EXCEPTION 'O administrador só pode cadastrar usuários do próprio CD.';
+        END IF;
+
+        IF p_nivel_acesso = 'admin' THEN
+            RAISE EXCEPTION 'Administradores não podem cadastrar outro administrador.';
+        END IF;
+    ELSIF v_nivel_executor = 'sistema' THEN
+        IF p_nivel_acesso <> 'admin' THEN
+            RAISE EXCEPTION 'O sistema só pode cadastrar o administrador inicial do CD.';
+        END IF;
+
+        IF EXISTS (
+            SELECT 1
+            FROM tb_usuario u
+            WHERE u.cod_cd = p_cod_cd
+              AND u.nivel_acesso = 'admin'
+        ) THEN
+            RAISE EXCEPTION 'O CD % já possui um administrador.', p_cod_cd;
+        END IF;
+    ELSE
+        RAISE EXCEPTION 'O usuário executor não possui permissão para cadastrar usuários.';
+    END IF;
+
+    IF p_nivel_acesso <> 'operador' AND p_cod_gestor IS NOT NULL THEN
+        RAISE EXCEPTION 'Somente operadores podem possuir um gestor responsável.';
+    END IF;
+
+    INSERT INTO tb_usuario (
+        nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor
+    ) VALUES (
+        p_nome, p_username, p_cpf, p_email, p_senha,
+        p_nivel_acesso, p_cod_cd, p_cod_gestor
+    );
+END;
+$$;
