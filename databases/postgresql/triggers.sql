@@ -3,6 +3,50 @@ DROP TRIGGER IF EXISTS trg_resolver_atendimento_por_justificativa ON tb_justific
 DROP TRIGGER IF EXISTS trg_validar_temperatura_categoria_camara ON tb_lote_camara_frigorifica;
 DROP TRIGGER IF EXISTS trg_gerar_alerta_por_leitura ON tb_leitura_temperatura;
 DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
+DROP TRIGGER IF EXISTS trg_validar_gestor_usuario ON tb_usuario;
+
+
+CREATE OR REPLACE FUNCTION fn_validar_gestor_usuario()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.cod_gestor IS NOT NULL AND NEW.nivel_acesso <> 'operador' THEN
+        RAISE EXCEPTION
+            'Somente usuários operadores podem possuir um gestor responsável.';
+    END IF;
+
+    IF NEW.cod_gestor IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM tb_usuario gestor
+        WHERE gestor.id = NEW.cod_gestor
+          AND gestor.nivel_acesso = 'gestor'
+          AND gestor.cod_cd = NEW.cod_cd
+    ) THEN
+        RAISE EXCEPTION
+            'O gestor % deve existir, ter nível gestor e pertencer ao mesmo CD do funcionário %.',
+            NEW.cod_gestor, NEW.id;
+    END IF;
+
+    IF TG_OP = 'UPDATE'
+       AND OLD.nivel_acesso = 'gestor'
+       AND NEW.nivel_acesso <> 'gestor'
+       AND EXISTS (
+           SELECT 1
+           FROM tb_usuario subordinado
+           WHERE subordinado.cod_gestor = OLD.id
+       ) THEN
+        RAISE EXCEPTION
+            'O gestor % não pode perder o cargo enquanto possuir operadores vinculados.',
+            OLD.id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_gestor_usuario
+BEFORE INSERT OR UPDATE OF cod_gestor, cod_cd, nivel_acesso
+ON tb_usuario
+FOR EACH ROW EXECUTE FUNCTION fn_validar_gestor_usuario();
 
 
 CREATE OR REPLACE FUNCTION fn_criar_atendimento_pendente()

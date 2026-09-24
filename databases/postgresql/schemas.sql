@@ -48,6 +48,7 @@ CREATE TABLE tb_endereco (
 	cod_cd INTEGER NOT NULL,
 
 	CONSTRAINT pk_endereco PRIMARY KEY (id),
+	CONSTRAINT uq_endereco_cep UNIQUE (cep),
 	CONSTRAINT fk_endereco_estado FOREIGN KEY (cod_estado) REFERENCES tb_estado(id),
 	CONSTRAINT fk_endereco_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id) ON DELETE CASCADE,
 	CONSTRAINT ck_endereco_numero CHECK (numero >= 0)
@@ -56,16 +57,23 @@ CREATE TABLE tb_endereco (
 CREATE TABLE tb_usuario (
 	id SERIAL,
 	nome VARCHAR(150) NOT NULL,
+	username VARCHAR(50) NOT NULL,
 	cpf VARCHAR(11) NOT NULL,
 	email VARCHAR(255) NOT NULL,
 	senha VARCHAR(255) NOT NULL,
 	nivel_acesso VARCHAR(8) NOT NULL DEFAULT 'operador',
 	cod_cd INTEGER,
+	cod_gestor INTEGER,
 
 	CONSTRAINT pk_usuario PRIMARY KEY (id),
+	CONSTRAINT uq_usuario_username UNIQUE (username),
 	CONSTRAINT uq_usuario_cpf UNIQUE (cpf),
 	CONSTRAINT uq_usuario_email UNIQUE (email),
 	CONSTRAINT fk_usuario_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id),
+	CONSTRAINT uq_usuario_id_cd UNIQUE (id, cod_cd),
+	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
+		REFERENCES tb_usuario(id, cod_cd),
+	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
 	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin', 'sistema'))
 );
 
@@ -144,7 +152,7 @@ CREATE TABLE tb_alerta (
 	CONSTRAINT pk_alerta PRIMARY KEY (id),
 	CONSTRAINT fk_alerta_camara_frigorifica FOREIGN KEY (cod_camara_frigorifica) REFERENCES tb_camara_frigorifica(id),
 	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('operador', 'gestor', 'admin')),
-	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('estável', 'atenção', 'crítica', 'urgente')),
+	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('baixa', 'atenção', 'urgente', 'crítica')),
 	CONSTRAINT ck_alerta_status CHECK (status IN ('ativo', 'reconhecido', 'resolvido')),
 	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('temperatura_fora_padrao'))
 );

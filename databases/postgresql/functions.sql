@@ -87,13 +87,13 @@ BEGIN
     v_diferenca := ABS(v_temperatura_atual - v_temperatura_ideal);
 
     IF v_diferenca <= 1 THEN
-        RETURN 'estável';
+        RETURN 'baixa';
     ELSIF v_diferenca <= 3 THEN
         RETURN 'atenção';
     ELSIF v_diferenca <= 5 THEN
-        RETURN 'crítica';
-    ELSE
         RETURN 'urgente';
+    ELSE
+        RETURN 'crítica';
     END IF;
 END;
 $$ LANGUAGE plpgsql;
