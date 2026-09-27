@@ -158,19 +158,6 @@ BEGIN
         IF p_nivel_acesso = 'admin' THEN
             RAISE EXCEPTION 'Administradores não podem cadastrar outro administrador.';
         END IF;
-    ELSIF v_nivel_executor = 'sistema' THEN
-        IF p_nivel_acesso <> 'admin' THEN
-            RAISE EXCEPTION 'O sistema só pode cadastrar o administrador inicial do CD.';
-        END IF;
-
-        IF EXISTS (
-            SELECT 1
-            FROM tb_usuario u
-            WHERE u.cod_cd = p_cod_cd
-              AND u.nivel_acesso = 'admin'
-        ) THEN
-            RAISE EXCEPTION 'O CD % já possui um administrador.', p_cod_cd;
-        END IF;
     ELSE
         RAISE EXCEPTION 'O usuário executor não possui permissão para cadastrar usuários.';
     END IF;

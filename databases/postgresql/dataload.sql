@@ -67,15 +67,8 @@ FROM generate_series(1, 100) AS gs;
 -- 4. USUÁRIOS
 -- =============================================
 
--- A trigger de auditoria precisa de um usuário existente para registrar cod_usuario.
 ALTER TABLE tb_usuario
 DISABLE TRIGGER trg_auditoria_usuario;
-
-INSERT INTO tb_usuario (
-    nome, username, cpf, email, senha, nivel_acesso
-)
-VALUES 
-('Sistema Worker', 'sistema', '00000000000', 'sistema@skadi.local', '$2b$12$3wu4y3is8.AuPIIvwioO1eCs8ErbMEWRcmCEgONkpZwBufwtHYC7K', 'sistema');
 
 INSERT INTO tb_usuario (
     nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor
@@ -102,7 +95,7 @@ SELECT
     END,
     ((gs - 1) % 5) + 1,
     CASE
-        WHEN gs > 30 THEN 12 + ((gs - 1) % 5)
+        WHEN gs > 30 THEN 11 + ((gs - 1) % 5)
         ELSE NULL
     END
 FROM generate_series(1, 100) AS gs
@@ -366,7 +359,7 @@ BEGIN
     ORDER BY id DESC
     LIMIT 1;
 
-    CALL sp_reconhecer_alerta(v_cod_alerta, 62);
+    CALL sp_reconhecer_alerta(v_cod_alerta, 61);
 END $$;
  
 INSERT INTO tb_justificativa (
@@ -394,7 +387,7 @@ BEGIN
     ORDER BY id DESC
     LIMIT 1;
 
-    CALL sp_reconhecer_alerta(v_cod_alerta, 42);
+    CALL sp_reconhecer_alerta(v_cod_alerta, 41);
 END $$;
 
 

@@ -74,7 +74,7 @@ CREATE TABLE tb_usuario (
 	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
 		REFERENCES tb_usuario(id, cod_cd),
 	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
-	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin', 'sistema'))
+	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin'))
 );
 
 CREATE TABLE tb_termometro (

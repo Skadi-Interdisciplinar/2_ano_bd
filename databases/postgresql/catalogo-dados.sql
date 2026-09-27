@@ -22,7 +22,7 @@ CREATE TABLE tb_catalogo_dados (
 	CONSTRAINT pk_catalogo_dados PRIMARY KEY (id),
 	CONSTRAINT uq_catalogo_tabela_coluna UNIQUE (nome_tabela, nome_coluna),
 	CONSTRAINT ck_catalogo_chave CHECK (chave IN ('PK', 'FK','NK')),
-	CONSTRAINT ck_catalogo_nivel_acesso CHECK (nivel_acesso_leitura IN ('sistema', 'operador', 'gestor', 'admin'))
+	CONSTRAINT ck_catalogo_nivel_acesso CHECK (nivel_acesso_leitura IN ('operador', 'gestor', 'admin'))
 );
 
 
@@ -50,7 +50,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_usuario', 'cpf', 'VARCHAR(11)', TRUE, 'NK', 'CPF do funcionário', 'Único no sistema; dado pessoal protegido por LGPD', 'admin', TRUE),
 ('tb_usuario', 'email', 'VARCHAR(255)', TRUE, 'NK', 'E-mail do funcionário', 'Único no sistema; usado para login e notificações', 'admin', TRUE),
 ('tb_usuario', 'senha', 'VARCHAR(255)', TRUE, NULL, 'Hash da senha de acesso', 'Nunca armazenada em texto plano; nunca exposta em relatórios ou exports', 'admin', TRUE),
-('tb_usuario', 'nivel_acesso', 'VARCHAR(8)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: operador, gestor, admin e sistema; sistema representa a administração da plataforma', 'gestor', FALSE),
+('tb_usuario', 'nivel_acesso', 'VARCHAR(8)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: operador, gestor e admin; acessos técnicos ao banco são controlados por roles PostgreSQL', 'gestor', FALSE),
 ('tb_usuario', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o funcionário pertence', 'Referencia tb_cd(id)', 'operador', FALSE),
 ('tb_usuario', 'cod_gestor', 'INTEGER', FALSE, 'FK', 'Gestor responsável pelo funcionário', 'Opcional; deve referenciar um usuário com nível gestor e do mesmo CD', 'gestor', FALSE),
  

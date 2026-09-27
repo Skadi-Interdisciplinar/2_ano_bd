@@ -78,7 +78,7 @@ CREATE TABLE tb_usuario (
 	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
 		REFERENCES tb_usuario(id, cod_cd),
 	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
-	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin', 'sistema'))
+	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin'))
 );
 
 CREATE TABLE tb_termometro (
@@ -534,16 +534,6 @@ BEGIN
         IF p_nivel_acesso = 'admin' THEN
             RAISE EXCEPTION 'Administradores não podem cadastrar outro administrador.';
         END IF;
-    ELSIF v_nivel_executor = 'sistema' THEN
-        IF p_nivel_acesso <> 'admin' THEN
-            RAISE EXCEPTION 'O sistema só pode cadastrar o administrador inicial do CD.';
-        END IF;
-        IF EXISTS (
-            SELECT 1 FROM tb_usuario u
-            WHERE u.cod_cd = p_cod_cd AND u.nivel_acesso = 'admin'
-        ) THEN
-            RAISE EXCEPTION 'O CD % já possui um administrador.', p_cod_cd;
-        END IF;
     ELSE
         RAISE EXCEPTION 'O usuário executor não possui permissão para cadastrar usuários.';
     END IF;
@@ -992,7 +982,7 @@ CREATE TABLE tb_catalogo_dados (
 	CONSTRAINT pk_catalogo_dados PRIMARY KEY (id),
 	CONSTRAINT uq_catalogo_tabela_coluna UNIQUE (nome_tabela, nome_coluna),
 	CONSTRAINT ck_catalogo_chave CHECK (chave IN ('PK', 'FK','NK')),
-	CONSTRAINT ck_catalogo_nivel_acesso CHECK (nivel_acesso_leitura IN ('sistema', 'operador', 'gestor', 'admin'))
+	CONSTRAINT ck_catalogo_nivel_acesso CHECK (nivel_acesso_leitura IN ('operador', 'gestor', 'admin'))
 );
 
 
@@ -1020,7 +1010,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_usuario', 'cpf', 'VARCHAR(11)', TRUE, 'NK', 'CPF do funcionário', 'Único no sistema; dado pessoal protegido por LGPD', 'admin', TRUE),
 ('tb_usuario', 'email', 'VARCHAR(255)', TRUE, 'NK', 'E-mail do funcionário', 'Único no sistema; usado para login e notificações', 'admin', TRUE),
 ('tb_usuario', 'senha', 'VARCHAR(255)', TRUE, NULL, 'Hash da senha de acesso', 'Nunca armazenada em texto plano; nunca exposta em relatórios ou exports', 'admin', TRUE),
-('tb_usuario', 'nivel_acesso', 'VARCHAR(8)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: operador, gestor, admin e sistema; sistema representa a administração da plataforma', 'gestor', FALSE),
+('tb_usuario', 'nivel_acesso', 'VARCHAR(8)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: operador, gestor e admin; acessos técnicos ao banco são controlados por roles PostgreSQL', 'gestor', FALSE),
 ('tb_usuario', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o funcionário pertence', 'Referencia tb_cd(id)', 'operador', FALSE),
 ('tb_usuario', 'cod_gestor', 'INTEGER', FALSE, 'FK', 'Gestor responsável pelo funcionário', 'Opcional; deve referenciar um usuário com nível gestor e do mesmo CD', 'gestor', FALSE),
  
@@ -1136,7 +1126,8 @@ SELECT
 FROM tb_log_acesso
 WHERE tentativa_sucesso = TRUE
   AND cod_usuario IS NOT NULL
-GROUP BY data_hora::DATE;
+GROUP BY data_hora::DATE
+ORDER BY data_acesso;
 
 -- ====================================================================
 -- DEPLOY: etl-transformacoes.sql
@@ -1271,7 +1262,6 @@ ORDER BY cod_alerta, ordem_etapa;
 DROP INDEX IF EXISTS idx_leitura_termometro_data;
 DROP INDEX IF EXISTS idx_alerta_escalonamento;
 DROP INDEX IF EXISTS idx_lote_camara_ativos;
-DROP INDEX IF EXISTS idx_atendimento_alerta_status;
 
 ANALYZE tb_leitura_temperatura;
 ANALYZE tb_alerta;
@@ -1303,19 +1293,11 @@ WHERE lc.cod_camara_frigorifica = 1
 -- DEPLOY: roles.sql
 -- ====================================================================
 
+-- 1. SYSTEM ROLES
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_operador') THEN
-        EXECUTE 'CREATE ROLE skadi_operador NOLOGIN';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_gestor') THEN
-        EXECUTE 'CREATE ROLE skadi_gestor NOLOGIN';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_admin') THEN
-        EXECUTE 'CREATE ROLE skadi_admin NOLOGIN';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_sistema') THEN
-        EXECUTE 'CREATE ROLE skadi_sistema NOLOGIN';
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sys_database_admin') THEN
+        EXECUTE 'CREATE ROLE sys_database_admin NOLOGIN';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_worker') THEN
         EXECUTE 'CREATE ROLE skadi_worker NOLOGIN';
@@ -1323,47 +1305,37 @@ BEGIN
 END;
 $$;
 
-GRANT USAGE ON SCHEMA public
-TO skadi_operador, skadi_gestor, skadi_admin, skadi_sistema, skadi_worker;
+-- 2. USERS
+-- As senhas devem ser configuradas fora do repositório.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'giovanna') THEN
+        EXECUTE 'CREATE USER giovanna WITH PASSWORD ''CHANGE_PASSWORD_GIOVANNA''';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mariana') THEN
+        EXECUTE 'CREATE USER mariana WITH PASSWORD ''CHANGE_PASSWORD_MARIANA''';
+    END IF;
+END;
+$$;
 
-GRANT SELECT ON
-    tb_cd,
-    tb_camara_frigorifica,
-    tb_categoria,
-    tb_lote,
-    tb_lote_camara_frigorifica,
-    tb_alerta,
-    tb_notificacao_alerta,
-    tb_atendimento,
-    tb_justificativa,
-    tb_leitura_temperatura
-TO skadi_operador, skadi_gestor, skadi_admin;
+-- 3. ROLE ASSIGNMENTS
+GRANT sys_database_admin TO giovanna;
+GRANT sys_database_admin TO mariana;
 
-GRANT SELECT (id, nome, username, email, nivel_acesso, cod_cd, cod_gestor)
-ON tb_usuario
-TO skadi_operador, skadi_gestor, skadi_admin;
-
+-- 4. DATABASE ADMIN
+GRANT USAGE, CREATE ON SCHEMA public TO sys_database_admin;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO sys_database_admin;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO sys_database_admin;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO sys_database_admin;
 GRANT EXECUTE ON PROCEDURE sp_reconhecer_alerta(INTEGER, INTEGER)
-TO skadi_operador, skadi_gestor, skadi_admin;
+TO sys_database_admin;
+GRANT EXECUTE ON PROCEDURE sp_cadastrar_usuario(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, INTEGER, INTEGER)
+TO sys_database_admin;
 
 REVOKE EXECUTE ON PROCEDURE sp_reconhecer_alerta(INTEGER, INTEGER) FROM PUBLIC;
 REVOKE EXECUTE ON PROCEDURE sp_notificar_nivel_acesso(INTEGER, VARCHAR) FROM PUBLIC;
 REVOKE EXECUTE ON PROCEDURE sp_escalonar_alertas_pendentes() FROM PUBLIC;
 REVOKE EXECUTE ON PROCEDURE sp_cadastrar_usuario(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, INTEGER, INTEGER) FROM PUBLIC;
-
-GRANT SELECT ON
-    tb_relatorio,
-    tb_assinatura,
-    tb_catalogo_dados,
-    tb_log_auditoria,
-    tb_log_escalonamento,
-    tb_log_acesso,
-    tb_log_acesso_relatorio,
-    tb_log_sensor
-TO skadi_gestor, skadi_admin;
-
-GRANT EXECUTE ON PROCEDURE sp_cadastrar_usuario(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, INTEGER, INTEGER)
-TO skadi_sistema, skadi_admin;
 
 GRANT SELECT ON
     tb_camara_frigorifica,
@@ -1384,7 +1356,37 @@ GRANT EXECUTE ON PROCEDURE sp_escalonar_alertas_pendentes()
 TO skadi_worker;
 
 REVOKE INSERT, UPDATE, DELETE ON tb_usuario
-FROM skadi_operador, skadi_gestor, skadi_admin, skadi_sistema, skadi_worker;
+FROM skadi_worker;
+
+-- 9. DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL PRIVILEGES ON TABLES TO sys_database_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL PRIVILEGES ON SEQUENCES TO sys_database_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL PRIVILEGES ON FUNCTIONS TO sys_database_admin;
+
+-- 2. ÍNDICES APLICADOS
+-- 1. CENÁRIO INICIAL: análise sem os índices
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT lt.id, lt.temperatura, lt.data_hora
+FROM tb_leitura_temperatura lt
+WHERE lt.cod_termometro = 1
+ORDER BY lt.data_hora DESC, lt.id DESC
+LIMIT 1;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT a.id, a.nivel_atual, a.data_hora
+FROM tb_alerta a
+WHERE a.status = 'ativo'
+  AND a.nivel_atual IN ('operador', 'gestor')
+ORDER BY a.data_hora;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT lc.cod_lote, lc.cod_camara_frigorifica
+FROM tb_lote_camara_frigorifica lc
+WHERE lc.cod_camara_frigorifica = 1
+  AND lc.data_saida IS NULL;
 
 -- 2. ÍNDICES APLICADOS
 CREATE INDEX idx_leitura_termometro_data
@@ -1396,9 +1398,6 @@ CREATE INDEX idx_alerta_escalonamento
 CREATE INDEX idx_lote_camara_ativos
     ON tb_lote_camara_frigorifica (cod_camara_frigorifica, cod_lote)
     WHERE data_saida IS NULL;
-
-CREATE INDEX idx_atendimento_alerta_status
-    ON tb_atendimento (cod_alerta, status);
 
 ANALYZE tb_leitura_temperatura;
 ANALYZE tb_alerta;
