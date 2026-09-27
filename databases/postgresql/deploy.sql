@@ -52,6 +52,7 @@ CREATE TABLE tb_endereco (
 	cod_cd INTEGER NOT NULL,
 
 	CONSTRAINT pk_endereco PRIMARY KEY (id),
+	CONSTRAINT uq_endereco_cep UNIQUE (cep),
 	CONSTRAINT fk_endereco_estado FOREIGN KEY (cod_estado) REFERENCES tb_estado(id),
 	CONSTRAINT fk_endereco_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id) ON DELETE CASCADE,
 	CONSTRAINT ck_endereco_numero CHECK (numero >= 0)
@@ -60,16 +61,23 @@ CREATE TABLE tb_endereco (
 CREATE TABLE tb_usuario (
 	id SERIAL,
 	nome VARCHAR(150) NOT NULL,
+	username VARCHAR(50) NOT NULL,
 	cpf VARCHAR(11) NOT NULL,
 	email VARCHAR(255) NOT NULL,
 	senha VARCHAR(255) NOT NULL,
 	nivel_acesso VARCHAR(8) NOT NULL DEFAULT 'operador',
 	cod_cd INTEGER,
+	cod_gestor INTEGER,
 
 	CONSTRAINT pk_usuario PRIMARY KEY (id),
+	CONSTRAINT uq_usuario_username UNIQUE (username),
 	CONSTRAINT uq_usuario_cpf UNIQUE (cpf),
 	CONSTRAINT uq_usuario_email UNIQUE (email),
 	CONSTRAINT fk_usuario_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id),
+	CONSTRAINT uq_usuario_id_cd UNIQUE (id, cod_cd),
+	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
+		REFERENCES tb_usuario(id, cod_cd),
+	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
 	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin', 'sistema'))
 );
 
@@ -148,7 +156,7 @@ CREATE TABLE tb_alerta (
 	CONSTRAINT pk_alerta PRIMARY KEY (id),
 	CONSTRAINT fk_alerta_camara_frigorifica FOREIGN KEY (cod_camara_frigorifica) REFERENCES tb_camara_frigorifica(id),
 	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('operador', 'gestor', 'admin')),
-	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('estável', 'atenção', 'crítica', 'urgente')),
+	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('baixa', 'atenção', 'urgente', 'crítica')),
 	CONSTRAINT ck_alerta_status CHECK (status IN ('ativo', 'reconhecido', 'resolvido')),
 	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('temperatura_fora_padrao'))
 );
@@ -326,13 +334,13 @@ BEGIN
     v_diferenca := ABS(v_temperatura_atual - v_temperatura_ideal);
 
     IF v_diferenca <= 1 THEN
-        RETURN 'estável';
+        RETURN 'baixa';
     ELSIF v_diferenca <= 3 THEN
         RETURN 'atenção';
     ELSIF v_diferenca <= 5 THEN
-        RETURN 'crítica';
-    ELSE
         RETURN 'urgente';
+    ELSE
+        RETURN 'crítica';
     END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -471,6 +479,89 @@ END;
 $$;
 
 
+-- Cadastra usuários somente por meio de um executor autorizado.
+CREATE OR REPLACE PROCEDURE sp_cadastrar_usuario(
+    p_nome VARCHAR(150),
+    p_username VARCHAR(50),
+    p_cpf VARCHAR(11),
+    p_email VARCHAR(255),
+    p_senha VARCHAR(255),
+    p_nivel_acesso VARCHAR(8),
+    p_cod_cd INTEGER,
+    p_cod_gestor INTEGER DEFAULT NULL
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+    v_cod_executor INTEGER;
+    v_nivel_executor VARCHAR(8);
+    v_cd_executor INTEGER;
+    v_usuario_atual TEXT;
+BEGIN
+    v_usuario_atual := current_setting('app.usuario_atual', true);
+    IF v_usuario_atual IS NULL OR v_usuario_atual = '' THEN
+        RAISE EXCEPTION 'Usuário executor não informado.';
+    END IF;
+
+    BEGIN
+        v_cod_executor := v_usuario_atual::INTEGER;
+    EXCEPTION WHEN invalid_text_representation THEN
+        RAISE EXCEPTION 'app.usuario_atual deve conter um ID inteiro.';
+    END;
+
+    SELECT u.nivel_acesso, u.cod_cd
+    INTO v_nivel_executor, v_cd_executor
+    FROM tb_usuario u
+    WHERE u.id = v_cod_executor;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Usuário executor % não encontrado.', v_cod_executor;
+    END IF;
+
+    IF p_nivel_acesso NOT IN ('operador', 'gestor', 'admin') THEN
+        RAISE EXCEPTION 'Nível de acesso inválido para cadastro: %.', p_nivel_acesso;
+    END IF;
+    IF p_cod_cd IS NULL THEN
+        RAISE EXCEPTION 'O CD do novo usuário é obrigatório.';
+    END IF;
+
+    IF v_nivel_executor = 'admin' THEN
+        IF v_cd_executor IS DISTINCT FROM p_cod_cd THEN
+            RAISE EXCEPTION 'O administrador só pode cadastrar usuários do próprio CD.';
+        END IF;
+        IF p_nivel_acesso = 'admin' THEN
+            RAISE EXCEPTION 'Administradores não podem cadastrar outro administrador.';
+        END IF;
+    ELSIF v_nivel_executor = 'sistema' THEN
+        IF p_nivel_acesso <> 'admin' THEN
+            RAISE EXCEPTION 'O sistema só pode cadastrar o administrador inicial do CD.';
+        END IF;
+        IF EXISTS (
+            SELECT 1 FROM tb_usuario u
+            WHERE u.cod_cd = p_cod_cd AND u.nivel_acesso = 'admin'
+        ) THEN
+            RAISE EXCEPTION 'O CD % já possui um administrador.', p_cod_cd;
+        END IF;
+    ELSE
+        RAISE EXCEPTION 'O usuário executor não possui permissão para cadastrar usuários.';
+    END IF;
+
+    IF p_nivel_acesso <> 'operador' AND p_cod_gestor IS NOT NULL THEN
+        RAISE EXCEPTION 'Somente operadores podem possuir um gestor responsável.';
+    END IF;
+
+    INSERT INTO tb_usuario (
+        nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor
+    ) VALUES (
+        p_nome, p_username, p_cpf, p_email, p_senha,
+        p_nivel_acesso, p_cod_cd, p_cod_gestor
+    );
+END;
+$$;
+
+
 -- ====================================================================
 -- DEPLOY: triggers.sql
 -- ====================================================================
@@ -480,6 +571,50 @@ DROP TRIGGER IF EXISTS trg_resolver_atendimento_por_justificativa ON tb_justific
 DROP TRIGGER IF EXISTS trg_validar_temperatura_categoria_camara ON tb_lote_camara_frigorifica;
 DROP TRIGGER IF EXISTS trg_gerar_alerta_por_leitura ON tb_leitura_temperatura;
 DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
+DROP TRIGGER IF EXISTS trg_validar_gestor_usuario ON tb_usuario;
+
+
+CREATE OR REPLACE FUNCTION fn_validar_gestor_usuario()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.cod_gestor IS NOT NULL AND NEW.nivel_acesso <> 'operador' THEN
+        RAISE EXCEPTION
+            'Somente usuários operadores podem possuir um gestor responsável.';
+    END IF;
+
+    IF NEW.cod_gestor IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM tb_usuario gestor
+        WHERE gestor.id = NEW.cod_gestor
+          AND gestor.nivel_acesso = 'gestor'
+          AND gestor.cod_cd = NEW.cod_cd
+    ) THEN
+        RAISE EXCEPTION
+            'O gestor % deve existir, ter nível gestor e pertencer ao mesmo CD do usuário %.',
+            NEW.cod_gestor, NEW.id;
+    END IF;
+
+    IF TG_OP = 'UPDATE'
+       AND OLD.nivel_acesso = 'gestor'
+       AND NEW.nivel_acesso <> 'gestor'
+       AND EXISTS (
+           SELECT 1
+           FROM tb_usuario subordinado
+           WHERE subordinado.cod_gestor = OLD.id
+       ) THEN
+        RAISE EXCEPTION
+            'O gestor % não pode perder o cargo enquanto possuir operadores vinculados.',
+            OLD.id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_gestor_usuario
+BEFORE INSERT OR UPDATE OF cod_gestor, cod_cd, nivel_acesso
+ON tb_usuario
+FOR EACH ROW EXECUTE FUNCTION fn_validar_gestor_usuario();
 
 
 CREATE OR REPLACE FUNCTION fn_criar_atendimento_pendente()
@@ -881,11 +1016,13 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- tb_usuario
 -- ==============================================
 ('tb_usuario', 'id', 'SERIAL', TRUE, 'PK', 'Identificador único do funcionário', NULL, 'operador', FALSE),
+('tb_usuario', 'username', 'VARCHAR(50)', TRUE, 'NK', 'Nome de usuário para autenticação', 'Único no sistema; usado no login da aplicação', 'admin', TRUE),
 ('tb_usuario', 'cpf', 'VARCHAR(11)', TRUE, 'NK', 'CPF do funcionário', 'Único no sistema; dado pessoal protegido por LGPD', 'admin', TRUE),
 ('tb_usuario', 'email', 'VARCHAR(255)', TRUE, 'NK', 'E-mail do funcionário', 'Único no sistema; usado para login e notificações', 'admin', TRUE),
 ('tb_usuario', 'senha', 'VARCHAR(255)', TRUE, NULL, 'Hash da senha de acesso', 'Nunca armazenada em texto plano; nunca exposta em relatórios ou exports', 'admin', TRUE),
 ('tb_usuario', 'nivel_acesso', 'VARCHAR(8)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: operador, gestor, admin e sistema; sistema representa a administração da plataforma', 'gestor', FALSE),
 ('tb_usuario', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o funcionário pertence', 'Referencia tb_cd(id)', 'operador', FALSE),
+('tb_usuario', 'cod_gestor', 'INTEGER', FALSE, 'FK', 'Gestor responsável pelo funcionário', 'Opcional; deve referenciar um usuário com nível gestor e do mesmo CD', 'gestor', FALSE),
  
 -- ==============================================
 -- tb_categoria
@@ -922,7 +1059,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_alerta', 'cod_camara_frigorifica', 'INTEGER', TRUE, 'FK', 'Câmara frigorífica que originou o alerta', 'Todo alerta pertence à câmara que originou a ocorrência', 'operador', FALSE),
 ('tb_alerta', 'vida_util_referencia_horas', 'DECIMAL(7,2)', FALSE, NULL, 'Menor vida útil entre os lotes ativos no momento do alerta', 'Base dos prazos fixos de escalonamento', 'gestor', FALSE),
 ('tb_alerta', 'status', 'VARCHAR(100)', TRUE, NULL, 'Fase do atendimento do alerta', 'Não confundir com nivel_atual: status é sobre o atendimento (ativo/reconhecido/resolvido), nivel_atual é sobre o cargo responsável', 'operador', FALSE),
-('tb_alerta', 'nivel_gravidade', 'VARCHAR(100)', TRUE, NULL, 'Gravidade do alerta', 'Calculada via fn_calcular_gravidade_alerta: estável, atenção, crítica ou urgente', 'operador', FALSE),
+('tb_alerta', 'nivel_gravidade', 'VARCHAR(100)', TRUE, NULL, 'Gravidade do alerta', 'Calculada via fn_calcular_gravidade_alerta: baixa, atenção, urgente ou crítica', 'operador', FALSE),
 ('tb_alerta', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento de criação do alerta', 'Usado como referência para o escalonamento', 'operador', FALSE),
 ('tb_alerta', 'tipo', 'VARCHAR(100)', TRUE, NULL, 'Tipo da ocorrência', 'Atualmente limitado a temperatura_fora_padrao', 'operador', FALSE),
 
@@ -985,478 +1122,305 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_log_acesso', 'ip_origem', 'INET', TRUE, NULL, 'Endereço IP de onde partiu a tentativa de acesso', 'Considerado dado pessoal pela LGPD (permite identificação indireta do usuário)', 'admin', TRUE);
 
 
--- ====================================================================
--- DEPLOY: dataload.sql
--- ====================================================================
 
 -- ====================================================================
--- MASSA DE DADOS PARA TESTE DE VOLUME
+-- DEPLOY: dau.sql
 -- ====================================================================
-BEGIN;
 
+DROP VIEW IF EXISTS vw_dau_diario;
 
--- =============================================
--- 1. ESTADOS
--- =============================================
-INSERT INTO tb_estado (estado) VALUES
-('AC'), ('AL'), ('AP'), ('AM'), ('BA'), ('CE'), ('DF'), ('ES'), ('GO'), 
-('MA'), ('MT'), ('MS'), ('MG'), ('PA'), ('PB'), ('PR'), ('PE'), ('PI'),
-('RJ'), ('RN'), ('RS'), ('RO'), ('RR'), ('SC'), ('SP'), ('SE'), ('TO');
-
-
--- =============================================
--- 2. CENTROS DE DISTRIBUIÇÃO
--- =============================================
-INSERT INTO tb_cd (nome, cnpj) VALUES
-('CD São Paulo', '48372615000194'),
-('CD Rio de Janeiro', '71940582000163'),
-('CD Minas Gerais', '90218437000128'),
-('CD Paraná', '35847126000179'),
-('CD Santa Catarina', '62490381000147');
-
-
--- =============================================
--- 3. ENDEREÇOS
--- =============================================
-INSERT INTO tb_endereco
-    (cep, rua, numero, cidade, bairro, complemento, cod_estado, cod_cd)
+CREATE VIEW vw_dau_diario AS
 SELECT
-    (10000000 + gs)::VARCHAR(8),
-    'Rua Industrial ' || gs,
-    100 + gs,
+    data_hora::DATE AS data_acesso,
+    COUNT(DISTINCT cod_usuario) AS usuarios_ativos
+FROM tb_log_acesso
+WHERE tentativa_sucesso = TRUE
+  AND cod_usuario IS NOT NULL
+GROUP BY data_hora::DATE;
 
-    CASE ((gs - 1) % 5)
-        WHEN 0 THEN 'São Paulo'
-        WHEN 1 THEN 'Rio de Janeiro'
-        WHEN 2 THEN 'Belo Horizonte'
-        WHEN 3 THEN 'Curitiba'
-        ELSE 'Florianópolis'
-    END,
+-- ====================================================================
+-- DEPLOY: etl-transformacoes.sql
+-- ====================================================================
 
-    'Centro Industrial',
+-- ====================================================================
+-- TRANSFORMAÇÕES ETL: CTEs, WINDOW FUNCTIONS E CTE RECURSIVA
+-- ====================================================================
 
-    CASE
-        WHEN gs % 3 = 0 THEN 'Galpão ' || gs
-        ELSE NULL
-    END,
-
-    CASE ((gs - 1) % 5)
-        WHEN 0 THEN (SELECT id FROM tb_estado WHERE estado = 'SP')
-        WHEN 1 THEN (SELECT id FROM tb_estado WHERE estado = 'RJ')
-        WHEN 2 THEN (SELECT id FROM tb_estado WHERE estado = 'MG')
-        WHEN 3 THEN (SELECT id FROM tb_estado WHERE estado = 'PR')
-        ELSE (SELECT id FROM tb_estado WHERE estado = 'SC')
-    END,
-
-    ((gs - 1) % 5) + 1
-
-FROM generate_series(1, 100) AS gs;
-
-
--- =============================================
--- 4. USUÁRIOS
--- =============================================
-
--- A trigger de auditoria precisa de um usuário existente para registrar cod_usuario.
-ALTER TABLE tb_usuario
-DISABLE TRIGGER trg_auditoria_usuario;
-
-INSERT INTO tb_usuario (
-    nome, cpf, email, senha, nivel_acesso
-)
-VALUES 
-('Sistema Worker', '00000000000', 'sistema@skadi.local', '$2b$12$3wu4y3is8.AuPIIvwioO1eCs8ErbMEWRcmCEgONkpZwBufwtHYC7K', 'sistema');
-
-INSERT INTO tb_usuario (
-    nome, cpf, email, senha, nivel_acesso, cod_cd
+-- 1. CTE + Window Functions:
+-- consolida as leituras persistidas, classifica a situação térmica e
+-- calcula a variação e a média acumulada de cada termômetro.
+WITH leituras_classificadas AS (
+	SELECT
+		lt.id AS cod_leitura,
+		lt.cod_termometro,
+		cam.id AS cod_camara_frigorifica,
+		cam.localizacao,
+		cd.id AS cod_cd,
+		cd.nome AS centro_distribuicao,
+		lt.temperatura,
+		cam.temperatura_min,
+		cam.temperatura_max,
+		lt.data_hora,
+		lt.cod_alerta,
+		CASE
+			WHEN lt.temperatura BETWEEN cam.temperatura_min AND cam.temperatura_max
+				THEN 'normal'
+			ELSE 'fora_da_faixa'
+		END AS classificacao
+	FROM tb_leitura_temperatura lt
+	JOIN tb_camara_frigorifica cam
+	  ON cam.cod_termometro = lt.cod_termometro
+	JOIN tb_cd cd
+	  ON cd.id = cam.cod_cd
 )
 SELECT
-    (ARRAY[
-        'Ana', 'Bruno', 'Camila', 'Daniel', 'Eduarda',
-        'Felipe', 'Gabriela', 'Henrique', 'Isabela', 'João',
-        'Karina', 'Leonardo', 'Mariana', 'Nicolas', 'Olívia',
-        'Paulo', 'Rafaela', 'Samuel', 'Tatiana', 'Vinícius'
-    ])[((gs - 1) % 20) + 1]
-    || ' ' ||
-    (ARRAY[
-        'Almeida', 'Barbosa', 'Carvalho', 'Dias', 'Esteves'
-    ])[((gs - 1) / 20) + 1],
-    (10000000000 + (gs * 7919))::TEXT,
-    'colaborador' || LPAD(gs::TEXT, 3, '0') || '@skadi.com.br',
-    '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
-    CASE
-        WHEN gs <= 10 THEN 'admin'
-        WHEN gs <= 30 THEN 'gestor'
-        ELSE 'operador'
-    END,
-    ((gs - 1) % 5) + 1
-FROM generate_series(1, 100) AS gs;
+	leituras_classificadas.*,
+	LAG(temperatura) OVER (
+		PARTITION BY cod_termometro
+		ORDER BY data_hora, cod_leitura
+	) AS temperatura_anterior,
+	temperatura - LAG(temperatura) OVER (
+		PARTITION BY cod_termometro
+		ORDER BY data_hora, cod_leitura
+	) AS variacao_desde_leitura_anterior,
+	AVG(temperatura) OVER (
+		PARTITION BY cod_termometro
+		ORDER BY data_hora, cod_leitura
+		ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+	) AS temperatura_media_acumulada,
+	ROW_NUMBER() OVER (
+		PARTITION BY cod_camara_frigorifica
+		ORDER BY data_hora DESC, cod_leitura DESC
+	) AS ordem_leitura_mais_recente
+FROM leituras_classificadas;
 
-ALTER TABLE tb_usuario
-ENABLE TRIGGER trg_auditoria_usuario;
-
--- Define o usuário atual para as próximas auditorias.
-SELECT set_config('app.usuario_atual', '1', false);
-
-
--- =============================================
--- 5. TERMÔMETROS
--- =============================================
-INSERT INTO tb_termometro (modelo)
+-- 2. CTE + Window Functions:
+-- identifica a menor vida útil entre os lotes ativos de cada câmara.
+WITH lotes_ativos AS (
+	SELECT
+		l.id AS cod_lote,
+		l.codigo_lote,
+		c.nome AS categoria,
+		c.vida_util_horas,
+		lc.cod_camara_frigorifica,
+		lc.data_entrada
+	FROM tb_lote l
+	JOIN tb_categoria c
+	  ON c.id = l.cod_categoria
+	JOIN tb_lote_camara_frigorifica lc
+	  ON lc.cod_lote = l.id
+	 AND lc.data_saida IS NULL
+	WHERE l.status = 'ativo'
+)
 SELECT
-	CASE
-		WHEN gs % 3 = 0 THEN 'ThermoTrack T-300'
-		WHEN gs % 3 = 1 THEN 'SensorTemp ST-200'
-		ELSE 'ColdMonitor CM-100'
-	END
-	|| '-' || LPAD(gs::TEXT, 3, '0')
-FROM generate_series(1, 50) AS gs;
+	lotes_ativos.*,
+	MIN(vida_util_horas) OVER (
+		PARTITION BY cod_camara_frigorifica
+	) AS menor_vida_util_camara,
+	COUNT(*) OVER (
+		PARTITION BY cod_camara_frigorifica
+	) AS total_lotes_ativos_camara
+FROM lotes_ativos;
 
+-- 3. CTE recursiva:
+-- transforma a hierarquia de escalonamento em etapas de negócio.
+-- A recursão avança apenas até o nivel_atual real do alerta, então a
+-- profundidade varia por linha (1 a 3 etapas), em vez de ser sempre fixa.
+WITH RECURSIVE etapas_escalonamento AS (
+	SELECT
+		a.id AS cod_alerta,
+		a.data_hora AS inicio_alerta,
+		'operador'::VARCHAR(8) AS nivel,
+		1 AS ordem_etapa,
+		0 AS percentual_vida_util,
+		a.nivel_atual
+	FROM tb_alerta a
 
--- =============================================
--- 6. CATEGORIAS
--- =============================================
-INSERT INTO tb_categoria
-    (nome, temperatura_ideal, vida_util_horas)
-VALUES
-('Carnes bovinas resfriadas', 4.00, 8.00),
-('Carnes suínas resfriadas', 4.00, 7.00),
-('Aves resfriadas', 4.00, 6.00),
-('Carnes processadas resfriadas', 4.00, 5.00),
-('Pescados frescos', 0.00, 4.00),
-('Pescados congelados', -18.00, 4.00);
+	UNION ALL
 
-
--- =============================================
--- 7. CÂMARAS FRIGORÍFICAS
--- =============================================
-INSERT INTO tb_camara_frigorifica
-    (modelo, localizacao, temperatura_min, temperatura_max, cod_cd, cod_termometro)
-VALUES
-
--- Câmaras frigoríficas de Carnes e Aves — 4°C
-('ColdStorage CS-500', 'Setor Carnes - Câmara 01', 3.00, 4.50, 1, 1),
-('ColdStorage CS-500', 'Setor Carnes - Câmara 02', 2.00, 6.00, 1, 2),
-('FrioMaster FM-400', 'Setor Carnes - Câmara 03', 2.00, 6.00, 2, 3),
-('FrioMaster FM-400', 'Setor Carnes - Câmara 04', 2.00, 6.00, 2, 4),
-('RefrigPro RP-300', 'Setor Carnes - Câmara 05', 2.00, 6.00, 3, 5),
-('RefrigPro RP-300', 'Setor Carnes - Câmara 06', 2.00, 6.00, 3, 6),
-
--- Câmaras frigoríficas de Pescados — 0°C
-('ColdStorage CS-500', 'Setor Pescados - Câmara 01', -2.00, 2.00, 4, 7),
-('FrioMaster FM-400', 'Setor Pescados - Câmara 02', -2.00, 2.00, 4, 8),
-('RefrigPro RP-300', 'Setor Pescados - Câmara 03', -2.00, 2.00, 5, 9),
-
--- Câmaras frigoríficas de Congelados — -18°C
-('ColdStorage CS-500', 'Setor Congelados - Câmara 01', -22.00, -16.00, 1, 10),
-('FrioMaster FM-400', 'Setor Congelados - Câmara 02', -22.00, -16.00, 2, 11),
-('RefrigPro RP-300', 'Setor Congelados - Câmara 03', -22.00, -16.00, 3, 12);
-
-
--- =============================================
--- 8. LOTES
--- =============================================
-INSERT INTO tb_lote
-    (codigo_lote, cod_categoria, data_fabricacao, data_validade)
-VALUES
-('LOTE-2026-0001', 1, '2026-08-20', '2026-09-08'),
-('LOTE-2026-0002', 2, '2026-08-21', '2026-09-09'),
-('LOTE-2026-0003', 3, '2026-08-22', '2026-09-07'),
-('LOTE-2026-0004', 4, '2026-08-23', '2026-09-06'),
-('LOTE-2026-0005', 1, '2026-08-20', '2026-09-08'),
-('LOTE-2026-0006', 2, '2026-08-21', '2026-09-09'),
-('LOTE-2026-0007', 5, '2026-08-25', '2026-09-05'),
-('LOTE-2026-0008', 5, '2026-08-26', '2026-09-06'),
-('LOTE-2026-0009', 5, '2026-08-27', '2026-09-07'),
-('LOTE-2026-0010', 6, '2026-08-01', '2027-08-01'),
-('LOTE-2026-0011', 6, '2026-08-02', '2027-08-02'),
-('LOTE-2026-0012', 6, '2026-08-03', '2027-08-03');
-
-INSERT INTO tb_lote_camara_frigorifica (cod_lote, cod_camara_frigorifica)
-VALUES
-    (1, 1),
-    (2, 2),
-    (3, 1),
-    (4, 1),
-    (5, 3),
-    (6, 4),
-    (7, 7),
-    (8, 8),
-    (9, 9),
-    (10, 10),
-    (11, 11),
-    (12, 12);
-
-
--- =============================================
--- 9. LEITURAS DE TEMPERATURA
--- =============================================
-
--- 9.1 Leituras normais (dentro da faixa, não geram alerta)
-INSERT INTO tb_leitura_temperatura
-    (cod_termometro, temperatura, data_hora)
-VALUES
--- Câmara frigorífica 1 - faixa: 3°C a 4,5°C
-(1, 4.00, '2026-08-30 08:00:00'),
-(1, 4.50, '2026-08-30 20:00:00'),
-(1, 3.80, '2026-08-31 08:00:00'),
-(1, 4.20, '2026-08-31 20:00:00'),
-(1, 4.10, '2026-09-01 08:00:00'),
-(1, 3.90, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 2 - faixa: 2°C a 6°C
-(2, 3.50, '2026-08-30 08:00:00'),
-(2, 4.00, '2026-08-30 20:00:00'),
-(2, 4.30, '2026-08-31 08:00:00'),
-(2, 3.70, '2026-08-31 20:00:00'),
-(2, 4.20, '2026-09-01 08:00:00'),
-(2, 3.80, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 3 - faixa: 2°C a 6°C
-(3, 4.20, '2026-08-30 08:00:00'),
-(3, 3.80, '2026-08-30 20:00:00'),
-(3, 4.50, '2026-08-31 08:00:00'),
-(3, 4.00, '2026-08-31 20:00:00'),
-(3, 3.60, '2026-09-01 08:00:00'),
-(3, 4.40, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 4 - faixa: 2°C a 6°C
-(4, 3.90, '2026-08-30 08:00:00'),
-(4, 4.10, '2026-08-30 20:00:00'),
-(4, 4.40, '2026-08-31 08:00:00'),
-(4, 3.60, '2026-08-31 20:00:00'),
-(4, 4.00, '2026-09-01 08:00:00'),
-(4, 4.30, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 5 - faixa: 2°C a 6°C
-(5, 4.00, '2026-08-30 08:00:00'),
-(5, 4.30, '2026-08-30 20:00:00'),
-(5, 3.70, '2026-08-31 08:00:00'),
-(5, 4.20, '2026-08-31 20:00:00'),
-(5, 3.90, '2026-09-01 08:00:00'),
-(5, 4.10, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 6 - faixa: 2°C a 6°C
-(6, 3.80, '2026-08-30 08:00:00'),
-(6, 4.10, '2026-08-30 20:00:00'),
-(6, 4.50, '2026-08-31 08:00:00'),
-(6, 3.90, '2026-08-31 20:00:00'),
-(6, 4.20, '2026-09-01 08:00:00'),
-(6, 3.70, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 7 - faixa: -2°C a 2°C
-(7, 0.00, '2026-08-30 08:00:00'),
-(7, -0.50, '2026-08-30 20:00:00'),
-(7, 0.50, '2026-08-31 08:00:00'),
-(7, -1.00, '2026-08-31 20:00:00'),
-(7, 0.20, '2026-09-01 08:00:00'),
-(7, -0.30, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 8 - faixa: -2°C a 2°C
-(8, 0.50, '2026-08-30 08:00:00'),
-(8, -0.20, '2026-08-30 20:00:00'),
-(8, 0.80, '2026-08-31 08:00:00'),
-(8, -0.70, '2026-08-31 20:00:00'),
-(8, 0.30, '2026-09-01 08:00:00'),
-(8, -0.40, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 9 - faixa: -2°C a 2°C
-(9, -0.50, '2026-08-30 08:00:00'),
-(9, 0.00, '2026-08-30 20:00:00'),
-(9, 0.70, '2026-08-31 08:00:00'),
-(9, -0.30, '2026-08-31 20:00:00'),
-(9, 0.40, '2026-09-01 08:00:00'),
-(9, -0.80, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 10 - faixa: -22°C a -16°C
-(10, -18.00, '2026-08-30 08:00:00'),
-(10, -19.00, '2026-08-30 20:00:00'),
-(10, -17.50, '2026-08-31 08:00:00'),
-(10, -18.50, '2026-08-31 20:00:00'),
-(10, -20.00, '2026-09-01 08:00:00'),
-(10, -17.00, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 11 - faixa: -22°C a -16°C
-(11, -18.50, '2026-08-30 08:00:00'),
-(11, -19.50, '2026-08-30 20:00:00'),
-(11, -17.00, '2026-08-31 08:00:00'),
-(11, -18.00, '2026-08-31 20:00:00'),
-(11, -20.50, '2026-09-01 08:00:00'),
-(11, -17.50, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 12 - faixa: -22°C a -16°C
-(12, -19.00, '2026-08-30 08:00:00'),
-(12, -18.00, '2026-08-30 20:00:00'),
-(12, -17.50, '2026-08-31 08:00:00'),
-(12, -20.00, '2026-08-31 20:00:00'),
-(12, -18.50, '2026-09-01 08:00:00'),
-(12, -17.00, '2026-09-01 20:00:00');
-
--- 9.2 Leituras fora da faixa (geram alerta via trigger, um exemplo por gravidade)
-INSERT INTO tb_leitura_temperatura
-    (cod_termometro, temperatura, data_hora)
-VALUES
--- Câmara frigorífica 1 | Ideal: 4°C | Diferença: 0,80°C | Gravidade Estável
-(1, 4.80, '2026-09-02 08:00:00'),
-
--- Câmara frigorífica 2 | Ideal: 4°C | Diferença: 2,80°C | Gravidade Atenção
-(2, 6.80, '2026-09-02 08:30:00'),
-
--- Câmara frigorífica 7 | Ideal: 0°C | Diferença: 5°C | Gravidade Crítica
-(7, 5.00, '2026-09-02 09:00:00'),
-
--- Câmara frigorífica 10 | Ideal: -18°C | Diferença: 10°C | Gravidade Urgente
-(10, -8.00, '2026-09-02 09:30:00');
-
--- 9.3 Histórico adicional (mais dias de leituras normais, dentro da faixa de cada câmara frigorífica)
-INSERT INTO tb_leitura_temperatura (cod_termometro, temperatura, data_hora)
+	SELECT
+		etapas.cod_alerta,
+		etapas.inicio_alerta,
+		CASE etapas.nivel
+			WHEN 'operador' THEN 'gestor'
+			WHEN 'gestor' THEN 'admin'
+		END::VARCHAR(8) AS nivel,
+		etapas.ordem_etapa + 1,
+		CASE etapas.nivel
+			WHEN 'operador' THEN 40
+			WHEN 'gestor' THEN 70
+		END AS percentual_vida_util,
+		etapas.nivel_atual
+	FROM etapas_escalonamento etapas
+	WHERE etapas.nivel != etapas.nivel_atual
+	  AND etapas.nivel IN ('operador', 'gestor')
+)
 SELECT
-    r.cod_termometro,
-    round(
-        (
-            r.temperatura_min
-            + (r.temperatura_max - r.temperatura_min)
-            * (0.3 + 0.4 * random())
-        )::numeric,
-        2
-    ),
-    TIMESTAMP '2026-08-20 08:00:00'
-        + ((gs / 3) || ' days')::interval
-        + (((gs % 3) * 8) || ' hours')::interval
-FROM tb_camara_frigorifica r,
-     generate_series(0, 29) AS gs;
+	cod_alerta,
+	inicio_alerta,
+	nivel,
+	ordem_etapa,
+	percentual_vida_util
+FROM etapas_escalonamento
+ORDER BY cod_alerta, ordem_etapa;
+
+-- ====================================================================
+-- DEPLOY: indices.sql
+-- ====================================================================
+
+DROP INDEX IF EXISTS idx_leitura_termometro_data;
+DROP INDEX IF EXISTS idx_alerta_escalonamento;
+DROP INDEX IF EXISTS idx_lote_camara_ativos;
+DROP INDEX IF EXISTS idx_atendimento_alerta_status;
+
+ANALYZE tb_leitura_temperatura;
+ANALYZE tb_alerta;
+ANALYZE tb_lote_camara_frigorifica;
+
+-- 1. CENÁRIO INICIAL: análise sem os índices
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT lt.id, lt.temperatura, lt.data_hora
+FROM tb_leitura_temperatura lt
+WHERE lt.cod_termometro = 1
+ORDER BY lt.data_hora DESC, lt.id DESC
+LIMIT 1;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT a.id, a.nivel_atual, a.data_hora
+FROM tb_alerta a
+WHERE a.status = 'ativo'
+  AND a.nivel_atual IN ('operador', 'gestor')
+ORDER BY a.data_hora;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT lc.cod_lote, lc.cod_camara_frigorifica
+FROM tb_lote_camara_frigorifica lc
+WHERE lc.cod_camara_frigorifica = 1
+  AND lc.data_saida IS NULL;
 
 
--- =============================================
--- 10. FLUXO DE ATENDIMENTO (exemplo sobre os alertas gerados na seção 9.2)
--- =============================================
+-- ====================================================================
+-- DEPLOY: roles.sql
+-- ====================================================================
 
--- Leitura normal após o alerta da câmara frigorífica 1.
--- Permite que a justificativa seguinte encerre o atendimento e o alerta.
-INSERT INTO tb_leitura_temperatura
-    (cod_termometro, temperatura, data_hora)
-VALUES
-(1, 4.20, '2026-09-02 09:00:00');
- 
--- Reconhece e resolve o alerta de gravidade "estável" (câmara frigorífica 1)
 DO $$
-DECLARE
-    v_cod_alerta INTEGER;
 BEGIN
-    SELECT id
-    INTO v_cod_alerta
-    FROM tb_alerta
-    WHERE cod_camara_frigorifica = 1
-    ORDER BY id DESC
-    LIMIT 1;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_operador') THEN
+        EXECUTE 'CREATE ROLE skadi_operador NOLOGIN';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_gestor') THEN
+        EXECUTE 'CREATE ROLE skadi_gestor NOLOGIN';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_admin') THEN
+        EXECUTE 'CREATE ROLE skadi_admin NOLOGIN';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_sistema') THEN
+        EXECUTE 'CREATE ROLE skadi_sistema NOLOGIN';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skadi_worker') THEN
+        EXECUTE 'CREATE ROLE skadi_worker NOLOGIN';
+    END IF;
+END;
+$$;
 
-    CALL sp_reconhecer_alerta(v_cod_alerta, 62);
-END $$;
- 
-INSERT INTO tb_justificativa (
-    cod_atendimento, motivo, descricao
-)
-VALUES (
-    (SELECT a.id
-     FROM tb_atendimento a
-     JOIN tb_alerta al ON al.id = a.cod_alerta
-     WHERE al.cod_camara_frigorifica = 1
-     ORDER BY a.id DESC LIMIT 1),
-    'Porta aberta para reposição',
-    'Alerta gerado durante reposição manual de estoque; temperatura normalizada após fechamento da câmara.'
-);
- 
--- Reconhece o alerta crítico do câmara frigorífica 10, sem resolver
-DO $$
-DECLARE
-    v_cod_alerta INTEGER;
-BEGIN
-    SELECT id
-    INTO v_cod_alerta
-    FROM tb_alerta
-    WHERE cod_camara_frigorifica = 10
-    ORDER BY id DESC
-    LIMIT 1;
+GRANT USAGE ON SCHEMA public
+TO skadi_operador, skadi_gestor, skadi_admin, skadi_sistema, skadi_worker;
 
-    CALL sp_reconhecer_alerta(v_cod_alerta, 42);
-END $$;
+GRANT SELECT ON
+    tb_cd,
+    tb_camara_frigorifica,
+    tb_categoria,
+    tb_lote,
+    tb_lote_camara_frigorifica,
+    tb_alerta,
+    tb_notificacao_alerta,
+    tb_atendimento,
+    tb_justificativa,
+    tb_leitura_temperatura
+TO skadi_operador, skadi_gestor, skadi_admin;
 
+GRANT SELECT (id, nome, username, email, nivel_acesso, cod_cd, cod_gestor)
+ON tb_usuario
+TO skadi_operador, skadi_gestor, skadi_admin;
 
--- =============================================
--- 11. RELATÓRIOS
--- =============================================
-INSERT INTO tb_relatorio (
-    cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status
-)
-VALUES
-(2, 'a1b2c3d4e5f67890123456789012345678901234567890123456789012345678', '2026-08-01', '2026-08-31', 'gerado'),
-(3, 'b2c3d4e5f678901234567890123456789012345678901234567890123456789', '2026-08-01', '2026-08-31', 'assinado'),
-(4, 'c3d4e5f6789012345678901234567890123456789012345678901234567890', '2026-07-01', '2026-07-31', 'arquivado');
+GRANT EXECUTE ON PROCEDURE sp_reconhecer_alerta(INTEGER, INTEGER)
+TO skadi_operador, skadi_gestor, skadi_admin;
 
+REVOKE EXECUTE ON PROCEDURE sp_reconhecer_alerta(INTEGER, INTEGER) FROM PUBLIC;
+REVOKE EXECUTE ON PROCEDURE sp_notificar_nivel_acesso(INTEGER, VARCHAR) FROM PUBLIC;
+REVOKE EXECUTE ON PROCEDURE sp_escalonar_alertas_pendentes() FROM PUBLIC;
+REVOKE EXECUTE ON PROCEDURE sp_cadastrar_usuario(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, INTEGER, INTEGER) FROM PUBLIC;
 
--- =============================================
--- 12. ASSINATURAS
--- =============================================
-INSERT INTO tb_assinatura (
-    cod_relatorio, certificado_titular, numero_serie, 
-    autoridade_certificadora, algoritmo_assinatura,
-    assinatura, carimbo_tempo
-)
-VALUES
-(2, 'Sistema ColdChain', 'CERT-2026-0001', 'ICP-Brasil', 'SHA256withRSA', 'assinatura_simulada_relatorio_2', '2026-09-02 10:00:00'),
-(3, 'Sistema ColdChain', 'CERT-2026-0002', 'ICP-Brasil', 'SHA256withRSA', 'assinatura_simulada_relatorio_3', '2026-09-02 10:05:00');
+GRANT SELECT ON
+    tb_relatorio,
+    tb_assinatura,
+    tb_catalogo_dados,
+    tb_log_auditoria,
+    tb_log_escalonamento,
+    tb_log_acesso,
+    tb_log_acesso_relatorio,
+    tb_log_sensor
+TO skadi_gestor, skadi_admin;
 
+GRANT EXECUTE ON PROCEDURE sp_cadastrar_usuario(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, INTEGER, INTEGER)
+TO skadi_sistema, skadi_admin;
 
--- =============================================
--- 13. LOG DE ACESSO A RELATÓRIOS
--- =============================================
-INSERT INTO tb_log_acesso_relatorio (
-    cod_relatorio, cod_usuario, acao
-)
-VALUES
-    (1, 32, 'visualizou'),
-    (1, 33, 'baixou'),
-    (2, 33, 'visualizou'),
-    (3, 52, 'baixou');
+GRANT SELECT ON
+    tb_camara_frigorifica,
+    tb_lote_camara_frigorifica,
+    tb_lote,
+    tb_categoria
+TO skadi_worker;
+GRANT SELECT (id, nivel_acesso, cod_cd)
+ON tb_usuario TO skadi_worker;
+GRANT INSERT ON tb_leitura_temperatura TO skadi_worker;
+GRANT UPDATE (cod_alerta) ON tb_leitura_temperatura TO skadi_worker;
+GRANT INSERT ON tb_alerta, tb_atendimento, tb_notificacao_alerta TO skadi_worker;
+GRANT USAGE, SELECT ON SEQUENCE tb_leitura_temperatura_id_seq TO skadi_worker;
+GRANT USAGE, SELECT ON SEQUENCE tb_alerta_id_seq, tb_atendimento_id_seq, tb_notificacao_alerta_id_seq TO skadi_worker;
+GRANT EXECUTE ON PROCEDURE sp_notificar_nivel_acesso(INTEGER, VARCHAR)
+TO skadi_worker;
+GRANT EXECUTE ON PROCEDURE sp_escalonar_alertas_pendentes()
+TO skadi_worker;
 
+REVOKE INSERT, UPDATE, DELETE ON tb_usuario
+FROM skadi_operador, skadi_gestor, skadi_admin, skadi_sistema, skadi_worker;
 
--- Simulando escalonamento para gerar um log em tb_log_escalonamento
-UPDATE tb_alerta
-SET nivel_atual = 'gestor'
-WHERE id = (
-    SELECT id
-    FROM tb_alerta
-    WHERE nivel_gravidade = 'urgente'
-    ORDER BY id DESC
-    LIMIT 1
-);
+-- 2. ÍNDICES APLICADOS
+CREATE INDEX idx_leitura_termometro_data
+    ON tb_leitura_temperatura (cod_termometro, data_hora DESC, id DESC);
 
+CREATE INDEX idx_alerta_escalonamento
+    ON tb_alerta (status, nivel_atual, data_hora);
 
--- =============================================
--- 14. LOG DE SENSORES
--- =============================================
-INSERT INTO tb_log_sensor (
-    cod_termometro, tipo_evento, detalhes
-)
-VALUES
-(1, 'manutencao', 'Sensor calibrado'),
-(2, 'falha', 'Leitura fora do comportamento esperado'),
-(7, 'manutencao', 'Sensor verificado'),
-(10, 'bateria', 'Bateria do sensor substituída');
+CREATE INDEX idx_lote_camara_ativos
+    ON tb_lote_camara_frigorifica (cod_camara_frigorifica, cod_lote)
+    WHERE data_saida IS NULL;
 
+CREATE INDEX idx_atendimento_alerta_status
+    ON tb_atendimento (cod_alerta, status);
 
--- =============================================
--- 15. LOG DE ACESSO
--- =============================================
-INSERT INTO tb_log_acesso (
-    cod_usuario, tentativa_sucesso, ip_origem, user_agent, motivo_falha
-)
-VALUES
-	(2, TRUE, '192.168.1.10', 'Mozilla/5.0', NULL),
-	(32, TRUE, '192.168.1.11', 'Mozilla/5.0', NULL),
-	(33, TRUE, '192.168.1.12', 'Mozilla/5.0', NULL),
-	(52, TRUE, '192.168.1.13', 'Mozilla/5.0', NULL),
-	(42, FALSE, '192.168.1.14', 'Mozilla/5.0', 'Senha incorreta');
+ANALYZE tb_leitura_temperatura;
+ANALYZE tb_alerta;
+ANALYZE tb_lote_camara_frigorifica;
 
+-- 3. CENÁRIO OTIMIZADO: análise após os índices
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT lt.id, lt.temperatura, lt.data_hora
+FROM tb_leitura_temperatura lt
+WHERE lt.cod_termometro = 1
+ORDER BY lt.data_hora DESC, lt.id DESC
+LIMIT 1;
 
-COMMIT;
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT a.id, a.nivel_atual, a.data_hora
+FROM tb_alerta a
+WHERE a.status = 'ativo'
+  AND a.nivel_atual IN ('operador', 'gestor')
+ORDER BY a.data_hora;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT lc.cod_lote, lc.cod_camara_frigorifica
+FROM tb_lote_camara_frigorifica lc
+WHERE lc.cod_camara_frigorifica = 1
+  AND lc.data_saida IS NULL;

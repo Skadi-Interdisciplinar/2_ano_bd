@@ -1,5 +1,6 @@
 -- ====================================================================
 -- MASSA DE DADOS PARA TESTE DE VOLUME
+-- A carga possui mais de 500 registros distribuídos entre as tabelas.
 -- ====================================================================
 BEGIN;
 
@@ -71,13 +72,13 @@ ALTER TABLE tb_usuario
 DISABLE TRIGGER trg_auditoria_usuario;
 
 INSERT INTO tb_usuario (
-    nome, cpf, email, senha, nivel_acesso
+    nome, username, cpf, email, senha, nivel_acesso
 )
 VALUES 
-('Sistema Worker', '00000000000', 'sistema@skadi.local', '$2b$12$3wu4y3is8.AuPIIvwioO1eCs8ErbMEWRcmCEgONkpZwBufwtHYC7K', 'sistema');
+('Sistema Worker', 'sistema', '00000000000', 'sistema@skadi.local', '$2b$12$3wu4y3is8.AuPIIvwioO1eCs8ErbMEWRcmCEgONkpZwBufwtHYC7K', 'sistema');
 
 INSERT INTO tb_usuario (
-    nome, cpf, email, senha, nivel_acesso, cod_cd
+    nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor
 )
 SELECT
     (ARRAY[
@@ -90,6 +91,7 @@ SELECT
     (ARRAY[
         'Almeida', 'Barbosa', 'Carvalho', 'Dias', 'Esteves'
     ])[((gs - 1) / 20) + 1],
+    'colaborador' || LPAD(gs::TEXT, 3, '0'),
     (10000000000 + (gs * 7919))::TEXT,
     'colaborador' || LPAD(gs::TEXT, 3, '0') || '@skadi.com.br',
     '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
@@ -98,8 +100,13 @@ SELECT
         WHEN gs <= 30 THEN 'gestor'
         ELSE 'operador'
     END,
-    ((gs - 1) % 5) + 1
-FROM generate_series(1, 100) AS gs;
+    ((gs - 1) % 5) + 1,
+    CASE
+        WHEN gs > 30 THEN 12 + ((gs - 1) % 5)
+        ELSE NULL
+    END
+FROM generate_series(1, 100) AS gs
+ORDER BY gs;
 
 ALTER TABLE tb_usuario
 ENABLE TRIGGER trg_auditoria_usuario;
@@ -128,12 +135,12 @@ FROM generate_series(1, 50) AS gs;
 INSERT INTO tb_categoria
     (nome, temperatura_ideal, vida_util_horas)
 VALUES
-('Carnes bovinas resfriadas', 4.00, 8.00),
-('Carnes suínas resfriadas', 4.00, 7.00),
-('Aves resfriadas', 4.00, 6.00),
-('Carnes processadas resfriadas', 4.00, 5.00),
-('Pescados frescos', 0.00, 4.00),
-('Pescados congelados', -18.00, 4.00);
+('Alcatra bovina resfriada', 4.00, 240.00),
+('Contrafilé bovino resfriado', 4.00, 216.00),
+('Lombo suíno resfriado', 4.00, 168.00),
+('Peito de frango resfriado', 4.00, 120.00),
+('Filé de tilápia fresco', 0.00, 72.00),
+('Filé de salmão congelado', -18.00, 720.00);
 
 
 -- =============================================
@@ -305,16 +312,16 @@ VALUES
 INSERT INTO tb_leitura_temperatura
     (cod_termometro, temperatura, data_hora)
 VALUES
--- Câmara frigorífica 1 | Ideal: 4°C | Diferença: 0,80°C | Gravidade Estável
+-- Câmara frigorífica 1 | Ideal: 4°C | Diferença: 0,80°C | Gravidade Baixa
 (1, 4.80, '2026-09-02 08:00:00'),
 
 -- Câmara frigorífica 2 | Ideal: 4°C | Diferença: 2,80°C | Gravidade Atenção
 (2, 6.80, '2026-09-02 08:30:00'),
 
--- Câmara frigorífica 7 | Ideal: 0°C | Diferença: 5°C | Gravidade Crítica
+-- Câmara frigorífica 7 | Ideal: 0°C | Diferença: 5°C | Gravidade Urgente
 (7, 5.00, '2026-09-02 09:00:00'),
 
--- Câmara frigorífica 10 | Ideal: -18°C | Diferença: 10°C | Gravidade Urgente
+-- Câmara frigorífica 10 | Ideal: -18°C | Diferença: 10°C | Gravidade Crítica
 (10, -8.00, '2026-09-02 09:30:00');
 
 -- 9.3 Histórico adicional (mais dias de leituras normais, dentro da faixa de cada câmara frigorífica)
@@ -347,7 +354,7 @@ INSERT INTO tb_leitura_temperatura
 VALUES
 (1, 4.20, '2026-09-02 09:00:00');
  
--- Reconhece e resolve o alerta de gravidade "estável" (câmara frigorífica 1)
+-- Reconhece e resolve o alerta de gravidade "baixa" (câmara frigorífica 1)
 DO $$
 DECLARE
     v_cod_alerta INTEGER;
