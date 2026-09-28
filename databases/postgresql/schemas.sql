@@ -5,9 +5,10 @@ DROP TABLE IF EXISTS tb_atendimento CASCADE;
 DROP TABLE IF EXISTS tb_leitura_temperatura CASCADE;
 DROP TABLE IF EXISTS tb_notificacao_alerta CASCADE;
 DROP TABLE IF EXISTS tb_alerta CASCADE;
-DROP TABLE IF EXISTS tb_produto_refrigerador CASCADE;
-DROP TABLE IF EXISTS tb_refrigerador CASCADE;
-DROP TABLE IF EXISTS tb_produto CASCADE;
+DROP TABLE IF EXISTS tb_lote_camara_frigorifica CASCADE;
+DROP TABLE IF EXISTS tb_lote CASCADE;
+DROP TABLE IF EXISTS tb_categoria CASCADE;
+DROP TABLE IF EXISTS tb_camara_frigorifica CASCADE;
 DROP TABLE IF EXISTS tb_termometro CASCADE;
 DROP TABLE IF EXISTS tb_usuario CASCADE;
 DROP TABLE IF EXISTS tb_endereco CASCADE;
@@ -47,6 +48,7 @@ CREATE TABLE tb_endereco (
 	cod_cd INTEGER NOT NULL,
 
 	CONSTRAINT pk_endereco PRIMARY KEY (id),
+	CONSTRAINT uq_endereco_cep UNIQUE (cep),
 	CONSTRAINT fk_endereco_estado FOREIGN KEY (cod_estado) REFERENCES tb_estado(id),
 	CONSTRAINT fk_endereco_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id) ON DELETE CASCADE,
 	CONSTRAINT ck_endereco_numero CHECK (numero >= 0)
@@ -55,17 +57,24 @@ CREATE TABLE tb_endereco (
 CREATE TABLE tb_usuario (
 	id SERIAL,
 	nome VARCHAR(150) NOT NULL,
+	username VARCHAR(50) NOT NULL,
 	cpf VARCHAR(11) NOT NULL,
 	email VARCHAR(255) NOT NULL,
 	senha VARCHAR(255) NOT NULL,
 	nivel_acesso VARCHAR(8) NOT NULL DEFAULT 'operador',
 	cod_cd INTEGER,
+	cod_gestor INTEGER,
 
 	CONSTRAINT pk_usuario PRIMARY KEY (id),
+	CONSTRAINT uq_usuario_username UNIQUE (username),
 	CONSTRAINT uq_usuario_cpf UNIQUE (cpf),
 	CONSTRAINT uq_usuario_email UNIQUE (email),
 	CONSTRAINT fk_usuario_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id),
-	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('admin', 'gestor', 'operador', 'sistema'))
+	CONSTRAINT uq_usuario_id_cd UNIQUE (id, cod_cd),
+	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
+		REFERENCES tb_usuario(id, cod_cd),
+	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
+	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin'))
 );
 
 CREATE TABLE tb_termometro (
@@ -75,18 +84,18 @@ CREATE TABLE tb_termometro (
 	CONSTRAINT pk_termometro PRIMARY KEY (id)
 );
 
-CREATE TABLE tb_produto (
+CREATE TABLE tb_categoria (
 	id SERIAL,
 	nome VARCHAR(150) NOT NULL,
 	temperatura_ideal DECIMAL(5,2) NOT NULL,
-	tempo_sobrevivencia DECIMAL(5,2) NOT NULL,
-	validade DATE NOT NULL,
+	vida_util_horas DECIMAL(7,2) NOT NULL,
 
-	CONSTRAINT pk_produto PRIMARY KEY (id),
-	CONSTRAINT uq_produto_nome UNIQUE (nome)
+	CONSTRAINT pk_categoria PRIMARY KEY (id),
+	CONSTRAINT uq_categoria_nome UNIQUE (nome),
+	CONSTRAINT ck_categoria_vida_util CHECK (vida_util_horas > 0)
 );
 
-CREATE TABLE tb_refrigerador (
+CREATE TABLE tb_camara_frigorifica (
 	id SERIAL,
 	modelo VARCHAR(150) NOT NULL,
 	localizacao VARCHAR(100) NOT NULL,
@@ -95,39 +104,56 @@ CREATE TABLE tb_refrigerador (
 	cod_cd INTEGER NOT NULL,
 	cod_termometro INTEGER NOT NULL,
 
-	CONSTRAINT pk_refrigerador PRIMARY KEY (id),
-	CONSTRAINT fk_refrigerador_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id) ON DELETE RESTRICT,
-	CONSTRAINT fk_refrigerador_termometro FOREIGN KEY (cod_termometro) REFERENCES tb_termometro(id),
-	CONSTRAINT uq_refrigerador_termometro UNIQUE (cod_termometro)
+	CONSTRAINT pk_camara_frigorifica PRIMARY KEY (id),
+	CONSTRAINT fk_camara_frigorifica_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id) ON DELETE RESTRICT,
+	CONSTRAINT fk_camara_frigorifica_termometro FOREIGN KEY (cod_termometro) REFERENCES tb_termometro(id),
+	CONSTRAINT uq_camara_frigorifica_termometro UNIQUE (cod_termometro),
+	CONSTRAINT ck_camara_frigorifica_faixa_temperatura CHECK (temperatura_min < temperatura_max)
 );
 
-CREATE TABLE tb_produto_refrigerador (
+CREATE TABLE tb_lote (
 	id SERIAL,
-	cod_produto INTEGER NOT NULL,
-	cod_refrigerador INTEGER NOT NULL,
+	codigo_lote VARCHAR(50) NOT NULL,
+	cod_categoria INTEGER NOT NULL,
+	data_fabricacao DATE NOT NULL,
+	data_validade DATE NOT NULL,
+	status VARCHAR(20) NOT NULL DEFAULT 'ativo',
 
-	CONSTRAINT pk_produto_refrigerador PRIMARY KEY (id),
-	CONSTRAINT fk_produtoref_produto FOREIGN KEY (cod_produto) REFERENCES tb_produto(id),
-	CONSTRAINT fk_produtoref_refrigerador FOREIGN KEY (cod_refrigerador) REFERENCES tb_refrigerador(id),
-	CONSTRAINT uq_produto_refrigerador UNIQUE (cod_produto, cod_refrigerador)
+	CONSTRAINT pk_lote PRIMARY KEY (id),
+	CONSTRAINT uq_lote_codigo UNIQUE (codigo_lote),
+	CONSTRAINT fk_lote_categoria FOREIGN KEY (cod_categoria) REFERENCES tb_categoria(id),
+	CONSTRAINT ck_lote_datas CHECK (data_validade >= data_fabricacao),
+	CONSTRAINT ck_lote_status CHECK (status IN ('ativo', 'bloqueado', 'expedido', 'vencido'))
+);
+
+CREATE TABLE tb_lote_camara_frigorifica (
+	id SERIAL,
+	cod_lote INTEGER NOT NULL,
+	cod_camara_frigorifica INTEGER NOT NULL,
+	data_entrada TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	data_saida TIMESTAMP,
+
+	CONSTRAINT pk_lote_camara_frigorifica PRIMARY KEY (id),
+	CONSTRAINT fk_loteref_lote FOREIGN KEY (cod_lote) REFERENCES tb_lote(id),
+	CONSTRAINT fk_loteref_camara_frigorifica FOREIGN KEY (cod_camara_frigorifica) REFERENCES tb_camara_frigorifica(id),
+	CONSTRAINT ck_loteref_periodo CHECK (data_saida IS NULL OR data_saida > data_entrada)
 );
 
 CREATE TABLE tb_alerta (
 	id SERIAL,
-	cod_refrigerador INTEGER NOT NULL,
+	cod_camara_frigorifica INTEGER NOT NULL,
+	vida_util_referencia_horas DECIMAL(7,2),
 	nivel_atual VARCHAR(8) NOT NULL DEFAULT 'operador',
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	tipo VARCHAR(100) NOT NULL DEFAULT 'temperatura_fora_padrao',
 	nivel_gravidade VARCHAR(100) NOT NULL,
 	status VARCHAR(100) NOT NULL,
-	canal VARCHAR(100) NOT NULL,
 
 	CONSTRAINT pk_alerta PRIMARY KEY (id),
-	CONSTRAINT fk_alerta_refrigerador FOREIGN KEY (cod_refrigerador) REFERENCES tb_refrigerador(id),
+	CONSTRAINT fk_alerta_camara_frigorifica FOREIGN KEY (cod_camara_frigorifica) REFERENCES tb_camara_frigorifica(id),
 	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('operador', 'gestor', 'admin')),
-	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('baixa', 'media', 'alta', 'critica')),
+	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('baixa', 'atenção', 'urgente', 'crítica')),
 	CONSTRAINT ck_alerta_status CHECK (status IN ('ativo', 'reconhecido', 'resolvido')),
-	CONSTRAINT ck_alerta_canal CHECK (canal IN ('SMS', 'Whatsapp', 'E-mail')),
 	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('temperatura_fora_padrao'))
 );
 
@@ -148,10 +174,12 @@ CREATE TABLE tb_leitura_temperatura (
 	cod_alerta INTEGER,
 	temperatura DECIMAL(5,2) NOT NULL,
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	id_evento_redis VARCHAR(100),
 
 	CONSTRAINT pk_leitura_temperatura PRIMARY KEY (id),
 	CONSTRAINT fk_leitura_termometro FOREIGN KEY (cod_termometro) REFERENCES tb_termometro(id),
-	CONSTRAINT fk_leitura_alerta FOREIGN KEY (cod_alerta) REFERENCES tb_alerta(id)
+	CONSTRAINT fk_leitura_alerta FOREIGN KEY (cod_alerta) REFERENCES tb_alerta(id),
+	CONSTRAINT uq_leitura_evento_redis UNIQUE (id_evento_redis)
 );
 
 CREATE TABLE tb_atendimento (
