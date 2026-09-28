@@ -1,0 +1,3 @@
+databases/redis/.env
+databases/neo4j/.env
+__pycache__/
