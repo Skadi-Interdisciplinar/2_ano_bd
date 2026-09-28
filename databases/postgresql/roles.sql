@@ -54,7 +54,12 @@ GRANT SELECT ON
 TO skadi_worker;
 GRANT SELECT (id, nivel_acesso, cod_cd)
 ON tb_usuario TO skadi_worker;
+GRANT SELECT ON
+    tb_alerta,
+    tb_notificacao_alerta
+TO skadi_worker;
 GRANT INSERT ON tb_leitura_temperatura TO skadi_worker;
+GRANT SELECT ON tb_leitura_temperatura TO skadi_worker;
 GRANT UPDATE (cod_alerta) ON tb_leitura_temperatura TO skadi_worker;
 GRANT INSERT ON tb_alerta, tb_atendimento, tb_notificacao_alerta TO skadi_worker;
 GRANT USAGE, SELECT ON SEQUENCE
