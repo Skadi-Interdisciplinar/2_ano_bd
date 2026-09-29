@@ -1,3 +1,5 @@
 databases/redis/.env
 databases/neo4j/.env
+databases/mongodb/.env
+.env
 __pycache__/
