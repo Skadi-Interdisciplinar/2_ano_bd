@@ -6,10 +6,13 @@
 DROP INDEX IF EXISTS idx_leitura_termometro_data;
 DROP INDEX IF EXISTS idx_alerta_escalonamento;
 DROP INDEX IF EXISTS idx_lote_camara_ativos;
+DROP INDEX IF EXISTS idx_solicitacao_suporte_usuario_abertura;
+DROP INDEX IF EXISTS idx_solicitacao_suporte_responsavel_status;
 
 ANALYZE tb_leitura_temperatura;
 ANALYZE tb_alerta;
 ANALYZE tb_lote_camara_frigorifica;
+ANALYZE tb_solicitacao_suporte;
 
 -- ================================================================
 -- 1. CENÁRIO INICIAL: análise sem os índices
@@ -52,9 +55,16 @@ CREATE INDEX idx_lote_camara_ativos
 	ON tb_lote_camara_frigorifica (cod_camara_frigorifica, cod_lote)
 	WHERE data_saida IS NULL;
 
+CREATE INDEX idx_solicitacao_suporte_usuario_abertura
+	ON tb_solicitacao_suporte (cod_usuario_solicitante, data_hora_abertura DESC);
+
+CREATE INDEX idx_solicitacao_suporte_responsavel_status
+	ON tb_solicitacao_suporte (cod_usuario_responsavel, status);
+
 ANALYZE tb_leitura_temperatura;
 ANALYZE tb_alerta;
 ANALYZE tb_lote_camara_frigorifica;
+ANALYZE tb_solicitacao_suporte;
 
 -- ================================================================
 -- 3. CENÁRIO OTIMIZADO: análise após os índices

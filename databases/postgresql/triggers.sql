@@ -4,35 +4,82 @@ DROP TRIGGER IF EXISTS trg_validar_temperatura_categoria_camara ON tb_lote_camar
 DROP TRIGGER IF EXISTS trg_gerar_alerta_por_leitura ON tb_leitura_temperatura;
 DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_validar_gestor_usuario ON tb_usuario;
-
+DROP TRIGGER IF EXISTS trg_validar_solicitacao_suporte ON tb_solicitacao_suporte;
 
 CREATE OR REPLACE FUNCTION fn_validar_gestor_usuario()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.cod_gestor IS NOT NULL AND NEW.nivel_acesso <> 'operador' THEN
-        RAISE EXCEPTION
-            'Somente usuários operadores podem possuir um gestor responsável.';
+    -- Super ADM administra a plataforma e não possui CPF, CD ou gestor.
+    IF NEW.nivel_acesso = 'super_admin' THEN
+        IF NEW.cpf IS NOT NULL THEN
+            RAISE EXCEPTION
+                'Usuário super_admin não pode possuir CPF.';
+        END IF;
+
+        IF NEW.cod_cd IS NOT NULL THEN
+            RAISE EXCEPTION
+                'Usuário super_admin não pode estar vinculado a um CD.';
+        END IF;
+
+        IF NEW.cod_gestor IS NOT NULL THEN
+            RAISE EXCEPTION
+                'Usuário super_admin não pode possuir gestor responsável.';
+        END IF;
+
+        RETURN NEW;
     END IF;
 
-    IF NEW.cod_gestor IS NOT NULL AND NOT EXISTS (
-        SELECT 1
-        FROM tb_usuario gestor
-        WHERE gestor.id = NEW.cod_gestor
-          AND gestor.nivel_acesso = 'gestor'
-          AND gestor.cod_cd = NEW.cod_cd
-    ) THEN
+    -- ADM, Gestor e Operador devem possuir CPF e CD.
+    IF NEW.cpf IS NULL THEN
         RAISE EXCEPTION
-            'O gestor % deve existir, ter nível gestor e pertencer ao mesmo CD do funcionário %.',
-            NEW.cod_gestor, NEW.id;
+            'Usuário com nível % deve possuir CPF.',
+            NEW.nivel_acesso;
     END IF;
 
+    IF NEW.cod_cd IS NULL THEN
+        RAISE EXCEPTION
+            'Usuário com nível % deve estar vinculado a um CD.',
+            NEW.nivel_acesso;
+    END IF;
+
+    -- ADM e Gestor não possuem gestor responsável.
+    IF NEW.nivel_acesso IN ('admin', 'gestor')
+       AND NEW.cod_gestor IS NOT NULL THEN
+        RAISE EXCEPTION
+            'Usuário com nível % não pode possuir gestor responsável.',
+            NEW.nivel_acesso;
+    END IF;
+
+    -- Operador deve possuir gestor responsável.
+    IF NEW.nivel_acesso = 'operador'
+       AND NEW.cod_gestor IS NULL THEN
+        RAISE EXCEPTION
+            'Usuário operador deve possuir gestor responsável.';
+    END IF;
+
+    -- O gestor do operador deve ser gestor e pertencer ao mesmo CD.
+    IF NEW.nivel_acesso = 'operador'
+       AND NOT EXISTS (
+            SELECT 1
+            FROM tb_usuario gestor
+            WHERE gestor.id = NEW.cod_gestor
+              AND gestor.nivel_acesso = 'gestor'
+              AND gestor.cod_cd = NEW.cod_cd
+       ) THEN
+        RAISE EXCEPTION
+            'O gestor % deve existir, ter nível gestor e pertencer ao mesmo CD do operador %.',
+            NEW.cod_gestor,
+            NEW.id;
+    END IF;
+
+    -- Um gestor não pode deixar de ser gestor enquanto possuir operadores vinculados.
     IF TG_OP = 'UPDATE'
        AND OLD.nivel_acesso = 'gestor'
        AND NEW.nivel_acesso <> 'gestor'
        AND EXISTS (
-           SELECT 1
-           FROM tb_usuario subordinado
-           WHERE subordinado.cod_gestor = OLD.id
+            SELECT 1
+            FROM tb_usuario subordinado
+            WHERE subordinado.cod_gestor = OLD.id
        ) THEN
         RAISE EXCEPTION
             'O gestor % não pode perder o cargo enquanto possuir operadores vinculados.',
@@ -44,9 +91,85 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_validar_gestor_usuario
-BEFORE INSERT OR UPDATE OF cod_gestor, cod_cd, nivel_acesso
+BEFORE INSERT OR UPDATE OF cpf, cod_gestor, cod_cd, nivel_acesso
 ON tb_usuario
-FOR EACH ROW EXECUTE FUNCTION fn_validar_gestor_usuario();
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_gestor_usuario();
+
+
+CREATE OR REPLACE FUNCTION fn_validar_solicitacao_suporte()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.cod_usuario_responsavel IS NOT NULL
+       AND NOT EXISTS (
+            SELECT 1
+            FROM tb_usuario usuario_responsavel
+            WHERE usuario_responsavel.id = NEW.cod_usuario_responsavel
+              AND usuario_responsavel.nivel_acesso = 'super_admin'
+       ) THEN
+        RAISE EXCEPTION
+            'O responsável da solicitação de suporte deve possuir nível super_admin.';
+    END IF;
+
+    IF TG_OP = 'INSERT' AND NEW.status <> 'registrado' THEN
+        RAISE EXCEPTION
+            'Uma solicitação de suporte deve ser criada com status registrado.';
+    END IF;
+
+    IF NEW.status = 'registrado' THEN
+        IF NEW.cod_usuario_responsavel IS NOT NULL
+           OR NEW.resposta IS NOT NULL
+           OR NEW.data_hora_encerramento IS NOT NULL THEN
+            RAISE EXCEPTION
+                'Uma solicitação registrada não pode possuir responsável, resposta ou data de encerramento.';
+        END IF;
+    ELSIF NEW.status = 'em_atendimento' THEN
+        IF NEW.cod_usuario_responsavel IS NULL THEN
+            RAISE EXCEPTION
+                'Uma solicitação em atendimento deve possuir um responsável super_admin.';
+        END IF;
+
+        IF NEW.data_hora_encerramento IS NOT NULL THEN
+            RAISE EXCEPTION
+                'Uma solicitação em atendimento não pode possuir data de encerramento.';
+        END IF;
+    ELSIF NEW.status = 'atendido' THEN
+        IF NEW.cod_usuario_responsavel IS NULL
+           OR NEW.resposta IS NULL
+           OR NEW.data_hora_encerramento IS NULL THEN
+            RAISE EXCEPTION
+                'Uma solicitação atendida deve possuir responsável, resposta e data de encerramento.';
+        END IF;
+    END IF;
+
+    IF TG_OP = 'UPDATE' THEN
+        IF OLD.status = 'registrado'
+           AND NEW.status NOT IN ('registrado', 'em_atendimento') THEN
+            RAISE EXCEPTION
+                'A solicitação deve passar de registrado para em_atendimento antes de ser atendida.';
+        END IF;
+
+        IF OLD.status = 'em_atendimento'
+           AND NEW.status NOT IN ('em_atendimento', 'atendido') THEN
+            RAISE EXCEPTION
+                'A solicitação em atendimento só pode permanecer nesse status ou ser atendida.';
+        END IF;
+
+        IF OLD.status = 'atendido' AND NEW.status <> 'atendido' THEN
+            RAISE EXCEPTION
+                'Uma solicitação atendida não pode retornar a um status anterior.';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_solicitacao_suporte
+BEFORE INSERT OR UPDATE OF status, resposta, data_hora_encerramento, cod_usuario_responsavel
+ON tb_solicitacao_suporte
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_solicitacao_suporte();
 
 
 CREATE OR REPLACE FUNCTION fn_criar_atendimento_pendente()

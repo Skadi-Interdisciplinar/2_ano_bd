@@ -107,7 +107,7 @@ CREATE OR REPLACE PROCEDURE sp_cadastrar_usuario(
     p_cpf VARCHAR(11),
     p_email VARCHAR(255),
     p_senha VARCHAR(255),
-    p_nivel_acesso VARCHAR(8),
+    p_nivel_acesso VARCHAR(11),
     p_cod_cd INTEGER,
     p_cod_gestor INTEGER DEFAULT NULL
 )
@@ -117,7 +117,7 @@ SET search_path = pg_catalog, public
 AS $$
 DECLARE
     v_cod_executor INTEGER;
-    v_nivel_executor VARCHAR(8);
+    v_nivel_executor VARCHAR(11);
     v_cd_executor INTEGER;
     v_usuario_atual TEXT;
 BEGIN
@@ -142,28 +142,54 @@ BEGIN
         RAISE EXCEPTION 'Usuário executor % não encontrado.', v_cod_executor;
     END IF;
 
-    IF p_nivel_acesso NOT IN ('operador', 'gestor', 'admin') THEN
+    IF p_nivel_acesso NOT IN ('operador', 'gestor', 'admin', 'super_admin') THEN
         RAISE EXCEPTION 'Nível de acesso inválido para cadastro: %.', p_nivel_acesso;
     END IF;
 
-    IF p_cod_cd IS NULL THEN
+    IF p_nivel_acesso = 'super_admin' THEN
+        IF p_cpf IS NOT NULL
+           OR p_cod_cd IS NOT NULL
+           OR p_cod_gestor IS NOT NULL THEN
+            RAISE EXCEPTION
+                'Usuário super_admin não pode possuir CPF, CD ou gestor responsável.';
+        END IF;
+    ELSIF p_cpf IS NULL THEN
+        RAISE EXCEPTION
+            'O CPF do novo usuário é obrigatório.';
+    ELSIF p_cod_cd IS NULL THEN
         RAISE EXCEPTION 'O CD do novo usuário é obrigatório.';
     END IF;
 
-    IF v_nivel_executor = 'admin' THEN
+    IF p_nivel_acesso = 'operador' AND p_cod_gestor IS NULL THEN
+        RAISE EXCEPTION
+            'Usuário operador deve possuir gestor responsável.';
+    END IF;
+
+    IF p_nivel_acesso <> 'operador' AND p_cod_gestor IS NOT NULL THEN
+        RAISE EXCEPTION
+            'Somente operadores podem possuir gestor responsável.';
+    END IF;
+
+    -- Super ADM pode cadastrar outro Super ADM ou um ADM de um CD.
+    IF v_nivel_executor = 'super_admin' THEN
+        IF p_nivel_acesso NOT IN ('super_admin', 'admin') THEN
+            RAISE EXCEPTION
+                'Super ADM pode cadastrar somente super_administradores ou administradores.';
+        END IF;
+
+    -- ADM cadastra Gestor e Operador apenas no próprio CD.
+    ELSIF v_nivel_executor = 'admin' THEN
         IF v_cd_executor IS DISTINCT FROM p_cod_cd THEN
             RAISE EXCEPTION 'O administrador só pode cadastrar usuários do próprio CD.';
         END IF;
 
-        IF p_nivel_acesso = 'admin' THEN
-            RAISE EXCEPTION 'Administradores não podem cadastrar outro administrador.';
+        IF p_nivel_acesso NOT IN ('gestor', 'operador') THEN
+            RAISE EXCEPTION
+                'Administrador pode cadastrar somente gestores e operadores.';
         END IF;
+
     ELSE
         RAISE EXCEPTION 'O usuário executor não possui permissão para cadastrar usuários.';
-    END IF;
-
-    IF p_nivel_acesso <> 'operador' AND p_cod_gestor IS NOT NULL THEN
-        RAISE EXCEPTION 'Somente operadores podem possuir um gestor responsável.';
     END IF;
 
     INSERT INTO tb_usuario (
