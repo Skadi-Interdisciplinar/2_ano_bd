@@ -107,6 +107,21 @@ ENABLE TRIGGER trg_auditoria_usuario;
 -- Define o usuário atual para as próximas auditorias.
 SELECT set_config('app.usuario_atual', '1', false);
 
+-- Usuário administrador da plataforma, sem vínculo com CD ou gestor.
+INSERT INTO tb_usuario (
+    nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor
+)
+VALUES (
+    'Super ADM Skadi',
+    'mariproque',
+    NULL,
+    'marianaproque400@gmail.com',
+    'Tricolor.1930',
+    'super_admin',
+    NULL,
+    NULL
+);
+
 
 -- =============================================
 -- 5. TERMÔMETROS

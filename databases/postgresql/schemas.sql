@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS tb_assinatura CASCADE;
 DROP TABLE IF EXISTS tb_relatorio CASCADE;
+DROP TABLE IF EXISTS tb_solicitacao_suporte CASCADE;
 DROP TABLE IF EXISTS tb_justificativa CASCADE;
 DROP TABLE IF EXISTS tb_atendimento CASCADE;
 DROP TABLE IF EXISTS tb_leitura_temperatura CASCADE;
@@ -58,10 +59,10 @@ CREATE TABLE tb_usuario (
 	id SERIAL,
 	nome VARCHAR(150) NOT NULL,
 	username VARCHAR(50) NOT NULL,
-	cpf VARCHAR(11) NOT NULL,
+	cpf VARCHAR(11),
 	email VARCHAR(255) NOT NULL,
 	senha VARCHAR(255) NOT NULL,
-	nivel_acesso VARCHAR(8) NOT NULL DEFAULT 'operador',
+	nivel_acesso VARCHAR(11) NOT NULL DEFAULT 'operador',
 	cod_cd INTEGER,
 	cod_gestor INTEGER,
 
@@ -74,7 +75,34 @@ CREATE TABLE tb_usuario (
 	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
 		REFERENCES tb_usuario(id, cod_cd),
 	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
-	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin'))
+	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin', 'super_admin'))
+);
+
+CREATE TABLE tb_solicitacao_suporte (
+	id SERIAL,
+	cod_usuario_solicitante INTEGER NOT NULL,
+	categoria VARCHAR(20) NOT NULL,
+	descricao TEXT NOT NULL,
+	status VARCHAR(20) NOT NULL DEFAULT 'registrado',
+	data_hora_abertura TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	data_hora_encerramento TIMESTAMP,
+	resposta TEXT,
+	cod_usuario_responsavel INTEGER,
+
+	CONSTRAINT pk_solicitacao_suporte PRIMARY KEY (id),
+	CONSTRAINT fk_solicitacao_suporte_solicitante
+		FOREIGN KEY (cod_usuario_solicitante) REFERENCES tb_usuario(id),
+	CONSTRAINT fk_solicitacao_suporte_responsavel
+		FOREIGN KEY (cod_usuario_responsavel) REFERENCES tb_usuario(id),
+	CONSTRAINT ck_solicitacao_suporte_categoria
+		CHECK (categoria IN ('dúvida', 'sugestão', 'reclamação', 'outro')),
+	CONSTRAINT ck_solicitacao_suporte_status
+		CHECK (status IN ('registrado', 'em_atendimento', 'atendido')),
+	CONSTRAINT ck_solicitacao_suporte_encerramento
+		CHECK (
+			data_hora_encerramento IS NULL
+			OR data_hora_encerramento >= data_hora_abertura
+		)
 );
 
 CREATE TABLE tb_termometro (
