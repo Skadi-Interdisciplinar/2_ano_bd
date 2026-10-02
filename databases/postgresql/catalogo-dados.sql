@@ -58,7 +58,8 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- tb_categoria
 -- ==============================================
 ('tb_categoria', 'nome', 'VARCHAR(150)', TRUE, 'NK', 'Categoria de armazenamento', 'Única no sistema; concentra os parâmetros comuns aos lotes', 'operador', FALSE),
-('tb_categoria', 'temperatura_ideal', 'DECIMAL(5,2)', TRUE, NULL, 'Temperatura ideal da categoria', 'Usada para calcular a gravidade dos alertas', 'operador', FALSE),
+('tb_categoria', 'temperatura_min', 'DECIMAL(5,2)', TRUE, NULL, 'Limite mínimo de temperatura da categoria', 'Deve ser maior ou igual ao limite mínimo da câmara para que o lote possa ser armazenado nela', 'operador', FALSE),
+('tb_categoria', 'temperatura_max', 'DECIMAL(5,2)', TRUE, NULL, 'Limite máximo de temperatura da categoria', 'Deve ser menor ou igual ao limite máximo da câmara para que o lote possa ser armazenado nela', 'operador', FALSE),
 ('tb_categoria', 'vida_util_horas', 'DECIMAL(7,2)', TRUE, NULL, 'Vida útil da categoria em horas', 'Base direta do escalonamento do alerta', 'operador', FALSE),
  
 -- ==============================================
