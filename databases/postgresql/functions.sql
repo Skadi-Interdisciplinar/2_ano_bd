@@ -55,7 +55,8 @@ CREATE OR REPLACE FUNCTION fn_calcular_gravidade_alerta(
 RETURNS VARCHAR AS $$
 DECLARE
     v_temperatura_atual DECIMAL(5,2);
-    v_temperatura_ideal DECIMAL(5,2);
+    v_temperatura_min DECIMAL(5,2);
+    v_temperatura_max DECIMAL(5,2);
     v_diferenca DECIMAL(5,2);
 BEGIN
     IF NOT EXISTS (
@@ -66,25 +67,22 @@ BEGIN
         RAISE EXCEPTION 'Leitura de temperatura % não encontrada.', p_cod_leitura;
     END IF;
 
-    SELECT lt.temperatura, MIN(c.temperatura_ideal)
-    INTO v_temperatura_atual, v_temperatura_ideal
+    SELECT lt.temperatura, r.temperatura_min, r.temperatura_max
+    INTO v_temperatura_atual, v_temperatura_min, v_temperatura_max
     FROM tb_camara_frigorifica r
-    JOIN tb_lote_camara_frigorifica lr
-        ON lr.cod_camara_frigorifica = r.id AND lr.data_saida IS NULL
-    JOIN tb_lote l
-        ON l.id = lr.cod_lote AND l.status = 'ativo'
-    JOIN tb_categoria c
-        ON c.id = l.cod_categoria
     JOIN tb_leitura_temperatura lt
         ON r.cod_termometro = lt.cod_termometro
-    WHERE lt.id = p_cod_leitura
-    GROUP BY lt.temperatura;
+    WHERE lt.id = p_cod_leitura;
 
-    IF v_temperatura_ideal IS NULL THEN
-        RAISE EXCEPTION 'Nenhum lote ativo associado à câmara frigorífica da leitura %.', p_cod_leitura;
+    IF v_temperatura_min IS NULL THEN
+        RAISE EXCEPTION 'Nenhuma câmara frigorífica associada à leitura %.', p_cod_leitura;
     END IF;
 
-    v_diferenca := ABS(v_temperatura_atual - v_temperatura_ideal);
+    IF v_temperatura_atual < v_temperatura_min THEN
+        v_diferenca := v_temperatura_min - v_temperatura_atual;
+    ELSE
+        v_diferenca := v_temperatura_atual - v_temperatura_max;
+    END IF;
 
     IF v_diferenca <= 1 THEN
         RETURN 'baixa';

@@ -248,40 +248,38 @@ FOR EACH ROW EXECUTE FUNCTION fn_resolver_atendimento_por_justificativa();
 CREATE OR REPLACE FUNCTION fn_validar_temperatura_categoria_camara()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_temp_ideal DECIMAL(5,2);
-    v_temp_min DECIMAL(5,2);
-    v_temp_max DECIMAL(5,2);
+    v_categoria_temp_min DECIMAL(5,2);
+    v_categoria_temp_max DECIMAL(5,2);
+    v_camara_temp_min DECIMAL(5,2);
+    v_camara_temp_max DECIMAL(5,2);
 BEGIN
-    SELECT c.temperatura_ideal, cam.temperatura_min, cam.temperatura_max
-      INTO v_temp_ideal, v_temp_min, v_temp_max
+    SELECT
+        c.temperatura_min,
+        c.temperatura_max,
+        cam.temperatura_min,
+        cam.temperatura_max
+      INTO
+        v_categoria_temp_min,
+        v_categoria_temp_max,
+        v_camara_temp_min,
+        v_camara_temp_max
       FROM tb_lote l
       JOIN tb_categoria c ON c.id = l.cod_categoria
       JOIN tb_camara_frigorifica cam ON cam.id = NEW.cod_camara_frigorifica
      WHERE l.id = NEW.cod_lote;
 
-    IF v_temp_ideal IS NULL THEN
+    IF v_categoria_temp_min IS NULL THEN
         RAISE EXCEPTION 'Lote % ou câmara frigorífica % não encontrado.', NEW.cod_lote, NEW.cod_camara_frigorifica;
     END IF;
 
-    IF EXISTS (
-        SELECT 1
-          FROM tb_lote_camara_frigorifica lr
-          JOIN tb_lote lote_existente
-            ON lote_existente.id = lr.cod_lote
-          JOIN tb_categoria categoria_existente
-            ON categoria_existente.id = lote_existente.cod_categoria
-         WHERE lr.cod_camara_frigorifica = NEW.cod_camara_frigorifica
-           AND lr.data_saida IS NULL
-           AND lr.cod_lote <> NEW.cod_lote
-           AND lote_existente.status = 'ativo'
-           AND categoria_existente.temperatura_ideal IS DISTINCT FROM v_temp_ideal
-    ) THEN
-        RAISE EXCEPTION 'A câmara frigorífica % já possui lote ativo com temperatura ideal incompatível.', NEW.cod_camara_frigorifica;
-    END IF;
-
-    IF v_temp_ideal < v_temp_min OR v_temp_ideal > v_temp_max THEN
-        RAISE EXCEPTION 'Temperatura ideal da categoria (%) incompatível com a faixa da câmara frigorífica (% a %).',
-            v_temp_ideal, v_temp_min, v_temp_max;
+    IF v_categoria_temp_min < v_camara_temp_min
+       OR v_categoria_temp_max > v_camara_temp_max THEN
+        RAISE EXCEPTION
+            'Faixa da categoria (% a %) incompatível com a faixa da câmara frigorífica (% a %).',
+            v_categoria_temp_min,
+            v_categoria_temp_max,
+            v_camara_temp_min,
+            v_camara_temp_max;
     END IF;
 
     RETURN NEW;
