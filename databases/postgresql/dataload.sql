@@ -116,7 +116,7 @@ VALUES (
     'mariproque',
     NULL,
     'marianaproque400@gmail.com',
-    'Tricolor.1930',
+    '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
     'super_admin',
     NULL,
     NULL
@@ -141,14 +141,14 @@ FROM generate_series(1, 50) AS gs;
 -- 6. CATEGORIAS
 -- =============================================
 INSERT INTO tb_categoria
-    (nome, temperatura_ideal, vida_util_horas)
+    (nome, temperatura_min, temperatura_max, vida_util_horas)
 VALUES
-('Alcatra bovina resfriada', 4.00, 240.00),
-('Contrafilé bovino resfriado', 4.00, 216.00),
-('Lombo suíno resfriado', 4.00, 168.00),
-('Peito de frango resfriado', 4.00, 120.00),
-('Filé de tilápia fresco', 0.00, 72.00),
-('Filé de salmão congelado', -18.00, 720.00);
+('Alcatra bovina resfriada', 3.00, 4.50, 240.00),
+('Contrafilé bovino resfriado', 2.00, 6.00, 216.00),
+('Lombo suíno resfriado', 3.00, 4.50, 168.00),
+('Peito de frango resfriado', 3.00, 4.50, 120.00),
+('Filé de tilápia fresco', -2.00, 2.00, 72.00),
+('Filé de salmão congelado', -22.00, -16.00, 720.00);
 
 
 -- =============================================
@@ -320,16 +320,16 @@ VALUES
 INSERT INTO tb_leitura_temperatura
     (cod_termometro, temperatura, data_hora)
 VALUES
--- Câmara frigorífica 1 | Ideal: 4°C | Diferença: 0,80°C | Gravidade Baixa
+-- Câmara frigorífica 1 | Limite máximo: 4,5°C | Diferença: 0,30°C | Gravidade Baixa
 (1, 4.80, '2026-09-02 08:00:00'),
 
--- Câmara frigorífica 2 | Ideal: 4°C | Diferença: 2,80°C | Gravidade Atenção
+-- Câmara frigorífica 2 | Limite máximo: 6°C | Diferença: 0,80°C | Gravidade Baixa
 (2, 6.80, '2026-09-02 08:30:00'),
 
--- Câmara frigorífica 7 | Ideal: 0°C | Diferença: 5°C | Gravidade Urgente
+-- Câmara frigorífica 7 | Limite máximo: 2°C | Diferença: 3°C | Gravidade Atenção
 (7, 5.00, '2026-09-02 09:00:00'),
 
--- Câmara frigorífica 10 | Ideal: -18°C | Diferença: 10°C | Gravidade Crítica
+-- Câmara frigorífica 10 | Limite máximo: -16°C | Diferença: 8°C | Gravidade Crítica
 (10, -8.00, '2026-09-02 09:30:00');
 
 -- 9.3 Histórico adicional (mais dias de leituras normais, dentro da faixa de cada câmara frigorífica)

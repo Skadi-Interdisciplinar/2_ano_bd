@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS tb_assinatura CASCADE;
 DROP TABLE IF EXISTS tb_relatorio CASCADE;
+DROP TABLE IF EXISTS tb_controle_rpa CASCADE;
 DROP TABLE IF EXISTS tb_solicitacao_suporte CASCADE;
 DROP TABLE IF EXISTS tb_justificativa CASCADE;
 DROP TABLE IF EXISTS tb_atendimento CASCADE;
@@ -105,6 +106,13 @@ CREATE TABLE tb_solicitacao_suporte (
 		)
 );
 
+CREATE TABLE tb_controle_rpa (
+	nome_carga VARCHAR(100) NOT NULL,
+	ultima_execucao_sucesso TIMESTAMPTZ,
+
+	CONSTRAINT pk_controle_rpa PRIMARY KEY (nome_carga)
+);
+
 CREATE TABLE tb_termometro (
 	id SERIAL,
 	modelo VARCHAR(150) NOT NULL,
@@ -115,12 +123,14 @@ CREATE TABLE tb_termometro (
 CREATE TABLE tb_categoria (
 	id SERIAL,
 	nome VARCHAR(150) NOT NULL,
-	temperatura_ideal DECIMAL(5,2) NOT NULL,
+	temperatura_min DECIMAL(5,2) NOT NULL,
+	temperatura_max DECIMAL(5,2) NOT NULL,
 	vida_util_horas DECIMAL(7,2) NOT NULL,
 
 	CONSTRAINT pk_categoria PRIMARY KEY (id),
 	CONSTRAINT uq_categoria_nome UNIQUE (nome),
-	CONSTRAINT ck_categoria_vida_util CHECK (vida_util_horas > 0)
+	CONSTRAINT ck_categoria_vida_util CHECK (vida_util_horas > 0),
+	CONSTRAINT ck_categoria_faixa_temperatura CHECK (temperatura_min < temperatura_max)
 );
 
 CREATE TABLE tb_camara_frigorifica (

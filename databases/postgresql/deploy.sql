@@ -1,9 +1,9 @@
 -- ====================================================================
 -- DEPLOY: schemas.sql
 -- ====================================================================
-
 DROP TABLE IF EXISTS tb_assinatura CASCADE;
 DROP TABLE IF EXISTS tb_relatorio CASCADE;
+DROP TABLE IF EXISTS tb_controle_rpa CASCADE;
 DROP TABLE IF EXISTS tb_solicitacao_suporte CASCADE;
 DROP TABLE IF EXISTS tb_justificativa CASCADE;
 DROP TABLE IF EXISTS tb_atendimento CASCADE;
@@ -109,6 +109,13 @@ CREATE TABLE tb_solicitacao_suporte (
 		)
 );
 
+CREATE TABLE tb_controle_rpa (
+	nome_carga VARCHAR(100) NOT NULL,
+	ultima_execucao_sucesso TIMESTAMPTZ,
+
+	CONSTRAINT pk_controle_rpa PRIMARY KEY (nome_carga)
+);
+
 CREATE TABLE tb_termometro (
 	id SERIAL,
 	modelo VARCHAR(150) NOT NULL,
@@ -119,12 +126,14 @@ CREATE TABLE tb_termometro (
 CREATE TABLE tb_categoria (
 	id SERIAL,
 	nome VARCHAR(150) NOT NULL,
-	temperatura_ideal DECIMAL(5,2) NOT NULL,
+	temperatura_min DECIMAL(5,2) NOT NULL,
+	temperatura_max DECIMAL(5,2) NOT NULL,
 	vida_util_horas DECIMAL(7,2) NOT NULL,
 
 	CONSTRAINT pk_categoria PRIMARY KEY (id),
 	CONSTRAINT uq_categoria_nome UNIQUE (nome),
-	CONSTRAINT ck_categoria_vida_util CHECK (vida_util_horas > 0)
+	CONSTRAINT ck_categoria_vida_util CHECK (vida_util_horas > 0),
+	CONSTRAINT ck_categoria_faixa_temperatura CHECK (temperatura_min < temperatura_max)
 );
 
 CREATE TABLE tb_camara_frigorifica (
@@ -269,12 +278,9 @@ CREATE TABLE tb_assinatura (
 );
 
 
-
-
 -- ====================================================================
 -- DEPLOY: functions.sql
 -- ====================================================================
-
 CREATE OR REPLACE FUNCTION fn_calcular_vida_util_camara(
     p_cod_camara INTEGER
 )
@@ -332,7 +338,8 @@ CREATE OR REPLACE FUNCTION fn_calcular_gravidade_alerta(
 RETURNS VARCHAR AS $$
 DECLARE
     v_temperatura_atual DECIMAL(5,2);
-    v_temperatura_ideal DECIMAL(5,2);
+    v_temperatura_min DECIMAL(5,2);
+    v_temperatura_max DECIMAL(5,2);
     v_diferenca DECIMAL(5,2);
 BEGIN
     IF NOT EXISTS (
@@ -343,25 +350,22 @@ BEGIN
         RAISE EXCEPTION 'Leitura de temperatura % não encontrada.', p_cod_leitura;
     END IF;
 
-    SELECT lt.temperatura, MIN(c.temperatura_ideal)
-    INTO v_temperatura_atual, v_temperatura_ideal
+    SELECT lt.temperatura, r.temperatura_min, r.temperatura_max
+    INTO v_temperatura_atual, v_temperatura_min, v_temperatura_max
     FROM tb_camara_frigorifica r
-    JOIN tb_lote_camara_frigorifica lr
-        ON lr.cod_camara_frigorifica = r.id AND lr.data_saida IS NULL
-    JOIN tb_lote l
-        ON l.id = lr.cod_lote AND l.status = 'ativo'
-    JOIN tb_categoria c
-        ON c.id = l.cod_categoria
     JOIN tb_leitura_temperatura lt
         ON r.cod_termometro = lt.cod_termometro
-    WHERE lt.id = p_cod_leitura
-    GROUP BY lt.temperatura;
+    WHERE lt.id = p_cod_leitura;
 
-    IF v_temperatura_ideal IS NULL THEN
-        RAISE EXCEPTION 'Nenhum lote ativo associado à câmara frigorífica da leitura %.', p_cod_leitura;
+    IF v_temperatura_min IS NULL THEN
+        RAISE EXCEPTION 'Nenhuma câmara frigorífica associada à leitura %.', p_cod_leitura;
     END IF;
 
-    v_diferenca := ABS(v_temperatura_atual - v_temperatura_ideal);
+    IF v_temperatura_atual < v_temperatura_min THEN
+        v_diferenca := v_temperatura_min - v_temperatura_atual;
+    ELSE
+        v_diferenca := v_temperatura_atual - v_temperatura_max;
+    END IF;
 
     IF v_diferenca <= 1 THEN
         RETURN 'baixa';
@@ -402,12 +406,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-
-
 -- ====================================================================
 -- DEPLOY: procedures.sql
 -- ====================================================================
-
 CREATE OR REPLACE PROCEDURE sp_reconhecer_alerta(
     p_cod_alerta INTEGER,
     p_cod_usuario INTEGER
@@ -612,12 +613,9 @@ END;
 $$;
 
 
-
-
 -- ====================================================================
 -- DEPLOY: triggers.sql
 -- ====================================================================
-
 DROP TRIGGER IF EXISTS trg_criar_atendimento_pendente ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_resolver_atendimento_por_justificativa ON tb_justificativa;
 DROP TRIGGER IF EXISTS trg_validar_temperatura_categoria_camara ON tb_lote_camara_frigorifica;
@@ -868,40 +866,38 @@ FOR EACH ROW EXECUTE FUNCTION fn_resolver_atendimento_por_justificativa();
 CREATE OR REPLACE FUNCTION fn_validar_temperatura_categoria_camara()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_temp_ideal DECIMAL(5,2);
-    v_temp_min DECIMAL(5,2);
-    v_temp_max DECIMAL(5,2);
+    v_categoria_temp_min DECIMAL(5,2);
+    v_categoria_temp_max DECIMAL(5,2);
+    v_camara_temp_min DECIMAL(5,2);
+    v_camara_temp_max DECIMAL(5,2);
 BEGIN
-    SELECT c.temperatura_ideal, cam.temperatura_min, cam.temperatura_max
-      INTO v_temp_ideal, v_temp_min, v_temp_max
+    SELECT
+        c.temperatura_min,
+        c.temperatura_max,
+        cam.temperatura_min,
+        cam.temperatura_max
+      INTO
+        v_categoria_temp_min,
+        v_categoria_temp_max,
+        v_camara_temp_min,
+        v_camara_temp_max
       FROM tb_lote l
       JOIN tb_categoria c ON c.id = l.cod_categoria
       JOIN tb_camara_frigorifica cam ON cam.id = NEW.cod_camara_frigorifica
      WHERE l.id = NEW.cod_lote;
 
-    IF v_temp_ideal IS NULL THEN
+    IF v_categoria_temp_min IS NULL THEN
         RAISE EXCEPTION 'Lote % ou câmara frigorífica % não encontrado.', NEW.cod_lote, NEW.cod_camara_frigorifica;
     END IF;
 
-    IF EXISTS (
-        SELECT 1
-          FROM tb_lote_camara_frigorifica lr
-          JOIN tb_lote lote_existente
-            ON lote_existente.id = lr.cod_lote
-          JOIN tb_categoria categoria_existente
-            ON categoria_existente.id = lote_existente.cod_categoria
-         WHERE lr.cod_camara_frigorifica = NEW.cod_camara_frigorifica
-           AND lr.data_saida IS NULL
-           AND lr.cod_lote <> NEW.cod_lote
-           AND lote_existente.status = 'ativo'
-           AND categoria_existente.temperatura_ideal IS DISTINCT FROM v_temp_ideal
-    ) THEN
-        RAISE EXCEPTION 'A câmara frigorífica % já possui lote ativo com temperatura ideal incompatível.', NEW.cod_camara_frigorifica;
-    END IF;
-
-    IF v_temp_ideal < v_temp_min OR v_temp_ideal > v_temp_max THEN
-        RAISE EXCEPTION 'Temperatura ideal da categoria (%) incompatível com a faixa da câmara frigorífica (% a %).',
-            v_temp_ideal, v_temp_min, v_temp_max;
+    IF v_categoria_temp_min < v_camara_temp_min
+       OR v_categoria_temp_max > v_camara_temp_max THEN
+        RAISE EXCEPTION
+            'Faixa da categoria (% a %) incompatível com a faixa da câmara frigorífica (% a %).',
+            v_categoria_temp_min,
+            v_categoria_temp_max,
+            v_camara_temp_min,
+            v_camara_temp_max;
     END IF;
 
     RETURN NEW;
@@ -999,12 +995,9 @@ AFTER INSERT ON tb_alerta
 FOR EACH ROW EXECUTE FUNCTION fn_notificar_novo_alerta();
 
 
-
-
 -- ====================================================================
 -- DEPLOY: audit.sql
 -- ====================================================================
-
 DROP TABLE IF EXISTS tb_log_acesso;
 DROP TABLE IF EXISTS tb_log_auditoria;
 DROP TABLE IF EXISTS tb_log_acesso_relatorio;
@@ -1141,12 +1134,9 @@ CREATE TRIGGER trg_log_escalonamento
 AFTER UPDATE OF nivel_atual ON tb_alerta
 FOR EACH ROW EXECUTE FUNCTION fn_log_escalonamento();
 
-
-
 -- ====================================================================
 -- DEPLOY: catalogo-dados.sql
 -- ====================================================================
-
 -- ====================================================================
 -- LIMPEZA E CRIAÇÃO DA TABELA
 -- Tabela centralizadora do Catálogo de Dados corporativo.
@@ -1207,7 +1197,8 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- tb_categoria
 -- ==============================================
 ('tb_categoria', 'nome', 'VARCHAR(150)', TRUE, 'NK', 'Categoria de armazenamento', 'Única no sistema; concentra os parâmetros comuns aos lotes', 'operador', FALSE),
-('tb_categoria', 'temperatura_ideal', 'DECIMAL(5,2)', TRUE, NULL, 'Temperatura ideal da categoria', 'Usada para calcular a gravidade dos alertas', 'operador', FALSE),
+('tb_categoria', 'temperatura_min', 'DECIMAL(5,2)', TRUE, NULL, 'Limite mínimo de temperatura da categoria', 'Deve ser maior ou igual ao limite mínimo da câmara para que o lote possa ser armazenado nela', 'operador', FALSE),
+('tb_categoria', 'temperatura_max', 'DECIMAL(5,2)', TRUE, NULL, 'Limite máximo de temperatura da categoria', 'Deve ser menor ou igual ao limite máximo da câmara para que o lote possa ser armazenado nela', 'operador', FALSE),
 ('tb_categoria', 'vida_util_horas', 'DECIMAL(7,2)', TRUE, NULL, 'Vida útil da categoria em horas', 'Base direta do escalonamento do alerta', 'operador', FALSE),
 
 -- ==============================================
@@ -1303,12 +1294,9 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_log_acesso', 'ip_origem', 'INET', TRUE, NULL, 'Endereço IP de onde partiu a tentativa de acesso', 'Considerado dado pessoal pela LGPD (permite identificação indireta do usuário)', 'admin', TRUE);
 
 
-
-
 -- ====================================================================
 -- DEPLOY: dau.sql
 -- ====================================================================
-
 -- ====================================================================
 -- MONITORAMENTO DAU (DAILY ACTIVE USERS)
 -- ====================================================================
@@ -1326,12 +1314,9 @@ WHERE tentativa_sucesso = TRUE
 GROUP BY data_hora::DATE
 ORDER BY data_acesso;
 
-
-
 -- ====================================================================
 -- DEPLOY: etl-transformacoes.sql
 -- ====================================================================
-
 -- ====================================================================
 -- TRANSFORMAÇÕES ETL: CTEs, WINDOW FUNCTIONS E CTE RECURSIVA
 -- ====================================================================
@@ -1447,12 +1432,9 @@ SELECT
 FROM etapas_escalonamento
 ORDER BY cod_alerta, ordem_etapa;
 
-
-
 -- ====================================================================
 -- DEPLOY: indices.sql
 -- ====================================================================
-
 -- ====================================================================
 -- ÍNDICES E CONSULTAS DE ANÁLISE DE DESEMPENHO
 -- ====================================================================
@@ -1549,12 +1531,9 @@ WHERE lc.cod_camara_frigorifica = 1
 	AND lc.data_saida IS NULL;
 
 
-
-
 -- ====================================================================
 -- DEPLOY: roles.sql
 -- ====================================================================
-
 -- ====================================================================
 -- ROLES E USUÁRIOS DO POSTGRESQL
 -- ====================================================================
@@ -1645,12 +1624,9 @@ REVOKE EXECUTE ON PROCEDURE sp_escalonar_alertas_pendentes() FROM PUBLIC;
 REVOKE EXECUTE ON PROCEDURE sp_cadastrar_usuario(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, INTEGER, INTEGER) FROM PUBLIC;
 
 
-
-
 -- ====================================================================
 -- DEPLOY: dataload.sql
 -- ====================================================================
-
 -- ====================================================================
 -- MASSA DE DADOS PARA TESTE DE VOLUME
 -- A carga possui mais de 500 registros distribuídos entre as tabelas.
@@ -1769,7 +1745,7 @@ VALUES (
     'mariproque',
     NULL,
     'marianaproque400@gmail.com',
-    'Tricolor.1930',
+    '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
     'super_admin',
     NULL,
     NULL
@@ -1794,14 +1770,14 @@ FROM generate_series(1, 50) AS gs;
 -- 6. CATEGORIAS
 -- =============================================
 INSERT INTO tb_categoria
-    (nome, temperatura_ideal, vida_util_horas)
+    (nome, temperatura_min, temperatura_max, vida_util_horas)
 VALUES
-('Alcatra bovina resfriada', 4.00, 240.00),
-('Contrafilé bovino resfriado', 4.00, 216.00),
-('Lombo suíno resfriado', 4.00, 168.00),
-('Peito de frango resfriado', 4.00, 120.00),
-('Filé de tilápia fresco', 0.00, 72.00),
-('Filé de salmão congelado', -18.00, 720.00);
+('Alcatra bovina resfriada', 3.00, 4.50, 240.00),
+('Contrafilé bovino resfriado', 2.00, 6.00, 216.00),
+('Lombo suíno resfriado', 3.00, 4.50, 168.00),
+('Peito de frango resfriado', 3.00, 4.50, 120.00),
+('Filé de tilápia fresco', -2.00, 2.00, 72.00),
+('Filé de salmão congelado', -22.00, -16.00, 720.00);
 
 
 -- =============================================
@@ -1973,16 +1949,16 @@ VALUES
 INSERT INTO tb_leitura_temperatura
     (cod_termometro, temperatura, data_hora)
 VALUES
--- Câmara frigorífica 1 | Ideal: 4°C | Diferença: 0,80°C | Gravidade Baixa
+-- Câmara frigorífica 1 | Limite máximo: 4,5°C | Diferença: 0,30°C | Gravidade Baixa
 (1, 4.80, '2026-09-02 08:00:00'),
 
--- Câmara frigorífica 2 | Ideal: 4°C | Diferença: 2,80°C | Gravidade Atenção
+-- Câmara frigorífica 2 | Limite máximo: 6°C | Diferença: 0,80°C | Gravidade Baixa
 (2, 6.80, '2026-09-02 08:30:00'),
 
--- Câmara frigorífica 7 | Ideal: 0°C | Diferença: 5°C | Gravidade Urgente
+-- Câmara frigorífica 7 | Limite máximo: 2°C | Diferença: 3°C | Gravidade Atenção
 (7, 5.00, '2026-09-02 09:00:00'),
 
--- Câmara frigorífica 10 | Ideal: -18°C | Diferença: 10°C | Gravidade Crítica
+-- Câmara frigorífica 10 | Limite máximo: -16°C | Diferença: 8°C | Gravidade Crítica
 (10, -8.00, '2026-09-02 09:30:00');
 
 -- 9.3 Histórico adicional (mais dias de leituras normais, dentro da faixa de cada câmara frigorífica)
