@@ -972,6 +972,29 @@ AFTER INSERT ON tb_leitura_temperatura
 FOR EACH ROW EXECUTE FUNCTION fn_gerar_alerta_por_leitura();
 
 
+CREATE OR REPLACE FUNCTION fn_impedir_alerta_aberto_camara()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM tb_alerta
+        WHERE cod_camara_frigorifica = NEW.cod_camara_frigorifica
+          AND status IN ('ATIVO', 'RECONHECIDO')
+    ) THEN
+        RAISE EXCEPTION
+            'A câmara frigorífica % já possui um alerta aberto.',
+            NEW.cod_camara_frigorifica;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_impedir_alerta_aberto_camara
+BEFORE INSERT ON tb_alerta
+FOR EACH ROW EXECUTE FUNCTION fn_impedir_alerta_aberto_camara();
+
+
 CREATE OR REPLACE FUNCTION fn_notificar_novo_alerta()
 RETURNS TRIGGER AS $$
 DECLARE

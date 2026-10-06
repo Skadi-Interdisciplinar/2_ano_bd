@@ -1,0 +1,35 @@
+name: RPA - Carga Delta
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rpa-carga-delta
+  cancel-in-progress: false
+
+jobs:
+  executar-carga-delta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install -r rpa/requirements.txt
+
+      - name: Executar carga delta
+        env:
+          LEGACY_DATABASE_URL: ${{ secrets.LEGACY_DATABASE_URL }}
+          SKADI_DATABASE_URL: ${{ secrets.SKADI_DATABASE_URL }}
+          RPA_NOME_CARGA: carga_delta_legado
+        run: python rpa/carga_delta.py
