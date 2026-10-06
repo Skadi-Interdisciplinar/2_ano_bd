@@ -30,8 +30,8 @@ LIMIT 1;
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT a.id, a.nivel_atual, a.data_hora
 FROM tb_alerta a
-WHERE a.status = 'ativo'
-	AND a.nivel_atual IN ('operador', 'gestor')
+WHERE a.status = 'ATIVO'
+	AND a.nivel_atual IN ('OPERADOR', 'GESTOR')
 ORDER BY a.data_hora;
 
 -- Consulta 3: lotes atualmente ativos em uma câmara frigorífica
@@ -82,8 +82,8 @@ LIMIT 1;
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT a.id, a.nivel_atual, a.data_hora
 FROM tb_alerta a
-WHERE a.status = 'ativo'
-	AND a.nivel_atual IN ('operador', 'gestor')
+WHERE a.status = 'ATIVO'
+	AND a.nivel_atual IN ('OPERADOR', 'GESTOR')
 ORDER BY a.data_hora;
 
 -- Consulta 3: lotes atualmente ativos em uma câmara frigorífica

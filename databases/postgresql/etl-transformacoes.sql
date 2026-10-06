@@ -17,8 +17,8 @@ WITH leituras_classificadas AS (
 		lt.cod_alerta,
 		CASE
 			WHEN lt.temperatura BETWEEN cam.temperatura_min AND cam.temperatura_max
-				THEN 'normal'
-			ELSE 'fora_da_faixa'
+				THEN 'NORMAL'
+			ELSE 'FORA_DA_FAIXA'
 		END AS classificacao
 	FROM tb_leitura_temperatura lt
 	JOIN tb_camara_frigorifica cam
@@ -62,7 +62,7 @@ WITH lotes_ativos AS (
 	JOIN tb_lote_camara_frigorifica lc
 	  ON lc.cod_lote = l.id
 	 AND lc.data_saida IS NULL
-	WHERE l.status = 'ativo'
+	WHERE l.status = 'ATIVO'
 )
 SELECT
 	lotes_ativos.*,
@@ -79,7 +79,7 @@ WITH RECURSIVE etapas_escalonamento AS (
 	SELECT
 		a.id AS cod_alerta,
 		a.data_hora AS inicio_alerta,
-		'operador'::VARCHAR(8) AS nivel,
+		'OPERADOR'::VARCHAR(8) AS nivel,
 		1 AS ordem_etapa,
 		0 AS percentual_vida_util,
 		a.nivel_atual
@@ -91,18 +91,18 @@ WITH RECURSIVE etapas_escalonamento AS (
 		etapas.cod_alerta,
 		etapas.inicio_alerta,
 		CASE etapas.nivel
-			WHEN 'operador' THEN 'gestor'
-			WHEN 'gestor' THEN 'admin'
+			WHEN 'OPERADOR' THEN 'GESTOR'
+			WHEN 'GESTOR' THEN 'ADMIN'
 		END::VARCHAR(8) AS nivel,
 		etapas.ordem_etapa + 1,
 		CASE etapas.nivel
-			WHEN 'operador' THEN 40
-			WHEN 'gestor' THEN 70
+			WHEN 'OPERADOR' THEN 40
+			WHEN 'GESTOR' THEN 70
 		END AS percentual_vida_util,
 		etapas.nivel_atual
 	FROM etapas_escalonamento etapas
 	WHERE etapas.nivel != etapas.nivel_atual
-	  AND etapas.nivel IN ('operador', 'gestor')
+	  AND etapas.nivel IN ('OPERADOR', 'GESTOR')
 )
 SELECT
 	cod_alerta,

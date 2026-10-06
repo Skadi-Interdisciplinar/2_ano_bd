@@ -1,5 +1,6 @@
 databases/redis/.env
 databases/neo4j/.env
 databases/mongodb/.env
+rpa/.env
 .env
 __pycache__/

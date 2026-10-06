@@ -9,7 +9,7 @@ BEGIN;
 -- 1. ESTADOS
 -- =============================================
 INSERT INTO tb_estado (estado) VALUES
-('AC'), ('AL'), ('AP'), ('AM'), ('BA'), ('CE'), ('DF'), ('ES'), ('GO'), 
+('AC'), ('AL'), ('AP'), ('AM'), ('BA'), ('CE'), ('DF'), ('ES'), ('GO'),
 ('MA'), ('MT'), ('MS'), ('MG'), ('PA'), ('PB'), ('PR'), ('PE'), ('PI'),
 ('RJ'), ('RN'), ('RS'), ('RO'), ('RR'), ('SC'), ('SP'), ('SE'), ('TO');
 
@@ -89,9 +89,9 @@ SELECT
     'colaborador' || LPAD(gs::TEXT, 3, '0') || '@skadi.com.br',
     '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
     CASE
-        WHEN gs <= 10 THEN 'admin'
-        WHEN gs <= 30 THEN 'gestor'
-        ELSE 'operador'
+        WHEN gs <= 10 THEN 'ADMIN'
+        WHEN gs <= 30 THEN 'GESTOR'
+        ELSE 'OPERADOR'
     END,
     ((gs - 1) % 5) + 1,
     CASE
@@ -117,7 +117,7 @@ VALUES (
     NULL,
     'marianaproque400@gmail.com',
     '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
-    'super_admin',
+    'SUPER_ADMIN',
     NULL,
     NULL
 );
@@ -361,7 +361,7 @@ INSERT INTO tb_leitura_temperatura
     (cod_termometro, temperatura, data_hora)
 VALUES
 (1, 4.20, '2026-09-02 09:00:00');
- 
+
 -- Reconhece e resolve o alerta de gravidade "baixa" (câmara frigorífica 1)
 DO $$
 DECLARE
@@ -376,7 +376,7 @@ BEGIN
 
     CALL sp_reconhecer_alerta(v_cod_alerta, 61);
 END $$;
- 
+
 INSERT INTO tb_justificativa (
     cod_atendimento, motivo, descricao
 )
@@ -389,7 +389,7 @@ VALUES (
     'Porta aberta para reposição',
     'Alerta gerado durante reposição manual de estoque; temperatura normalizada após fechamento da câmara.'
 );
- 
+
 -- Reconhece o alerta crítico do câmara frigorífica 10, sem resolver
 DO $$
 DECLARE
@@ -413,16 +413,16 @@ INSERT INTO tb_relatorio (
     cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status
 )
 VALUES
-(2, 'a1b2c3d4e5f67890123456789012345678901234567890123456789012345678', '2026-08-01', '2026-08-31', 'gerado'),
-(3, 'b2c3d4e5f678901234567890123456789012345678901234567890123456789', '2026-08-01', '2026-08-31', 'assinado'),
-(4, 'c3d4e5f6789012345678901234567890123456789012345678901234567890', '2026-07-01', '2026-07-31', 'arquivado');
+(2, 'a1b2c3d4e5f67890123456789012345678901234567890123456789012345678', '2026-08-01', '2026-08-31', 'GERADO'),
+(3, 'b2c3d4e5f678901234567890123456789012345678901234567890123456789', '2026-08-01', '2026-08-31', 'ASSINADO'),
+(4, 'c3d4e5f6789012345678901234567890123456789012345678901234567890', '2026-07-01', '2026-07-31', 'ARQUIVADO');
 
 
 -- =============================================
 -- 12. ASSINATURAS
 -- =============================================
 INSERT INTO tb_assinatura (
-    cod_relatorio, certificado_titular, numero_serie, 
+    cod_relatorio, certificado_titular, numero_serie,
     autoridade_certificadora, algoritmo_assinatura,
     assinatura, carimbo_tempo
 )
@@ -438,19 +438,19 @@ INSERT INTO tb_log_acesso_relatorio (
     cod_relatorio, cod_usuario, acao
 )
 VALUES
-    (1, 32, 'visualizou'),
-    (1, 33, 'baixou'),
-    (2, 33, 'visualizou'),
-    (3, 52, 'baixou');
+    (1, 32, 'VISUALIZOU'),
+    (1, 33, 'BAIXOU'),
+    (2, 33, 'VISUALIZOU'),
+    (3, 52, 'BAIXOU');
 
 
 -- Simulando escalonamento para gerar um log em tb_log_escalonamento
 UPDATE tb_alerta
-SET nivel_atual = 'gestor'
+SET nivel_atual = 'GESTOR'
 WHERE id = (
     SELECT id
     FROM tb_alerta
-    WHERE nivel_gravidade = 'urgente'
+    WHERE nivel_gravidade = 'URGENTE'
     ORDER BY id DESC
     LIMIT 1
 );
@@ -463,10 +463,10 @@ INSERT INTO tb_log_sensor (
     cod_termometro, tipo_evento, detalhes
 )
 VALUES
-(1, 'manutencao', 'Sensor calibrado'),
-(2, 'falha', 'Leitura fora do comportamento esperado'),
-(7, 'manutencao', 'Sensor verificado'),
-(10, 'bateria', 'Bateria do sensor substituída');
+(1, 'MANUTENCAO', 'Sensor calibrado'),
+(2, 'FALHA', 'Leitura fora do comportamento esperado'),
+(7, 'MANUTENCAO', 'Sensor verificado'),
+(10, 'BATERIA', 'Bateria do sensor substituída');
 
 
 -- =============================================
