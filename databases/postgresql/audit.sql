@@ -31,8 +31,8 @@ CREATE TABLE tb_log_auditoria (
 	acao VARCHAR(150) NOT NULL,
 	entidade_afetada VARCHAR(50) NOT NULL,
 	entidade_id INTEGER NOT NULL,
-	dados_antigos JSONB,      
-	dados_novos JSONB,  
+	dados_antigos JSONB,
+	dados_novos JSONB,
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
 	CONSTRAINT pk_log_auditoria PRIMARY KEY (id),
@@ -49,7 +49,7 @@ CREATE TABLE tb_log_acesso_relatorio (
 	CONSTRAINT pk_log_acesso_relatorio PRIMARY KEY (id),
 	CONSTRAINT fk_log_acesso_relatorio_relatorio FOREIGN KEY (cod_relatorio) REFERENCES tb_relatorio(id),
 	CONSTRAINT fk_log_acesso_relatorio_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id),
-	CONSTRAINT ck_log_acesso_relatorio_acao CHECK (acao IN ('visualizou', 'baixou'))
+	CONSTRAINT ck_log_acesso_relatorio_acao CHECK (acao IN ('VISUALIZOU', 'BAIXOU'))
 );
 
 CREATE TABLE tb_log_escalonamento (
@@ -57,7 +57,7 @@ CREATE TABLE tb_log_escalonamento (
 	cod_alerta INTEGER NOT NULL,
 	nivel_anterior VARCHAR(8),
 	nivel_novo VARCHAR(8) NOT NULL,
-	motivo VARCHAR(50) NOT NULL DEFAULT 'tempo_limite_excedido',
+	motivo VARCHAR(50) NOT NULL DEFAULT 'TEMPO_LIMITE_EXCEDIDO',
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
 	CONSTRAINT pk_log_escalonamento PRIMARY KEY (id),
@@ -79,7 +79,7 @@ CREATE TABLE tb_log_sensor (
 -- =============================================
 -- TRIGGERS DE AUDITORIA
 -- =============================================
-CREATE OR REPLACE FUNCTION fn_log_auditoria() 
+CREATE OR REPLACE FUNCTION fn_log_auditoria()
 RETURNS TRIGGER AS $$
 DECLARE
 	v_entidade_id INTEGER;
@@ -118,7 +118,7 @@ AFTER INSERT OR UPDATE OR DELETE ON tb_alerta
 FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
 
 
-CREATE OR REPLACE FUNCTION fn_log_escalonamento() 
+CREATE OR REPLACE FUNCTION fn_log_escalonamento()
 RETURNS TRIGGER AS $$
 BEGIN
 	IF NEW.nivel_atual IS DISTINCT FROM OLD.nivel_atual THEN

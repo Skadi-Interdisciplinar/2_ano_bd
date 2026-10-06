@@ -23,16 +23,16 @@ BEGIN
     UPDATE tb_atendimento
     SET cod_usuario = p_cod_usuario,
         data_hora_reconhecimento = CURRENT_TIMESTAMP,
-        status = 'em_andamento'
-    WHERE cod_alerta = p_cod_alerta AND status = 'pendente';
+        status = 'EM_ANDAMENTO'
+    WHERE cod_alerta = p_cod_alerta AND status = 'PENDENTE';
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Nenhum atendimento pendente encontrado para o alerta %.', p_cod_alerta;
     END IF;
 
     UPDATE tb_alerta
-    SET status = 'reconhecido'
-    WHERE id = p_cod_alerta AND status = 'ativo';
+    SET status = 'RECONHECIDO'
+    WHERE id = p_cod_alerta AND status = 'ATIVO';
 END;
 $$;
 
@@ -51,7 +51,7 @@ BEGIN
         RAISE EXCEPTION 'Alerta % não encontrado.', p_cod_alerta;
     END IF;
 
-    IF p_nivel NOT IN ('operador', 'gestor', 'admin') THEN
+    IF p_nivel NOT IN ('OPERADOR', 'GESTOR', 'ADMIN') THEN
         RAISE EXCEPTION 'Nível de acesso inválido: %.', p_nivel;
     END IF;
 
@@ -76,21 +76,21 @@ BEGIN
     FOR v_alerta IN
         SELECT id, nivel_atual, data_hora
         FROM tb_alerta
-        WHERE status = 'ativo' AND nivel_atual IN ('operador', 'gestor')
+        WHERE status = 'ATIVO' AND nivel_atual IN ('OPERADOR', 'GESTOR')
     LOOP
         v_nivel_novo := NULL;
 
         IF CURRENT_TIMESTAMP >= v_alerta.data_hora
             + fn_calcular_prazo_escalonamento(v_alerta.id, 70) * INTERVAL '1 hour' THEN
-            v_nivel_novo := 'admin';
+            v_nivel_novo := 'ADMIN';
         ELSIF CURRENT_TIMESTAMP >= v_alerta.data_hora
             + fn_calcular_prazo_escalonamento(v_alerta.id, 40) * INTERVAL '1 hour'
-            AND v_alerta.nivel_atual = 'operador' THEN
-            v_nivel_novo := 'gestor';
+            AND v_alerta.nivel_atual = 'OPERADOR' THEN
+            v_nivel_novo := 'GESTOR';
         END IF;
 
         IF v_nivel_novo IS NOT NULL THEN
-            UPDATE tb_alerta 
+            UPDATE tb_alerta
             SET nivel_atual = v_nivel_novo
             WHERE id = v_alerta.id;
 
@@ -142,11 +142,11 @@ BEGIN
         RAISE EXCEPTION 'Usuário executor % não encontrado.', v_cod_executor;
     END IF;
 
-    IF p_nivel_acesso NOT IN ('operador', 'gestor', 'admin', 'super_admin') THEN
+    IF p_nivel_acesso NOT IN ('OPERADOR', 'GESTOR', 'ADMIN', 'SUPER_ADMIN') THEN
         RAISE EXCEPTION 'Nível de acesso inválido para cadastro: %.', p_nivel_acesso;
     END IF;
 
-    IF p_nivel_acesso = 'super_admin' THEN
+    IF p_nivel_acesso = 'SUPER_ADMIN' THEN
         IF p_cpf IS NOT NULL
            OR p_cod_cd IS NOT NULL
            OR p_cod_gestor IS NOT NULL THEN
@@ -160,30 +160,30 @@ BEGIN
         RAISE EXCEPTION 'O CD do novo usuário é obrigatório.';
     END IF;
 
-    IF p_nivel_acesso = 'operador' AND p_cod_gestor IS NULL THEN
+    IF p_nivel_acesso = 'OPERADOR' AND p_cod_gestor IS NULL THEN
         RAISE EXCEPTION
             'Usuário operador deve possuir gestor responsável.';
     END IF;
 
-    IF p_nivel_acesso <> 'operador' AND p_cod_gestor IS NOT NULL THEN
+    IF p_nivel_acesso <> 'OPERADOR' AND p_cod_gestor IS NOT NULL THEN
         RAISE EXCEPTION
             'Somente operadores podem possuir gestor responsável.';
     END IF;
 
     -- Super ADM pode cadastrar outro Super ADM ou um ADM de um CD.
-    IF v_nivel_executor = 'super_admin' THEN
-        IF p_nivel_acesso NOT IN ('super_admin', 'admin') THEN
+    IF v_nivel_executor = 'SUPER_ADMIN' THEN
+        IF p_nivel_acesso NOT IN ('SUPER_ADMIN', 'ADMIN') THEN
             RAISE EXCEPTION
                 'Super ADM pode cadastrar somente super_administradores ou administradores.';
         END IF;
 
     -- ADM cadastra Gestor e Operador apenas no próprio CD.
-    ELSIF v_nivel_executor = 'admin' THEN
+    ELSIF v_nivel_executor = 'ADMIN' THEN
         IF v_cd_executor IS DISTINCT FROM p_cod_cd THEN
             RAISE EXCEPTION 'O administrador só pode cadastrar usuários do próprio CD.';
         END IF;
 
-        IF p_nivel_acesso NOT IN ('gestor', 'operador') THEN
+        IF p_nivel_acesso NOT IN ('GESTOR', 'OPERADOR') THEN
             RAISE EXCEPTION
                 'Administrador pode cadastrar somente gestores e operadores.';
         END IF;

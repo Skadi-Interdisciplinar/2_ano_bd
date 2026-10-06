@@ -8,9 +8,9 @@ BEGIN
     SELECT MIN(c.vida_util_horas)
     INTO v_vida_util
     FROM tb_lote_camara_frigorifica lr
-    JOIN tb_lote l 
-        ON l.id = lr.cod_lote AND l.status = 'ativo'
-    JOIN tb_categoria c 
+    JOIN tb_lote l
+        ON l.id = lr.cod_lote AND l.status = 'ATIVO'
+    JOIN tb_categoria c
         ON c.id = l.cod_categoria
     WHERE lr.cod_camara_frigorifica = p_cod_camara AND lr.data_saida IS NULL;
 
@@ -85,13 +85,13 @@ BEGIN
     END IF;
 
     IF v_diferenca <= 1 THEN
-        RETURN 'baixa';
+        RETURN 'BAIXA';
     ELSIF v_diferenca <= 3 THEN
-        RETURN 'atenção';
+        RETURN 'ATENCAO';
     ELSIF v_diferenca <= 5 THEN
-        RETURN 'urgente';
+        RETURN 'URGENTE';
     ELSE
-        RETURN 'crítica';
+        RETURN 'CRITICA';
     END IF;
 END;
 $$ LANGUAGE plpgsql;

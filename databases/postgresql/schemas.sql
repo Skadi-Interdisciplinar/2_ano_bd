@@ -63,7 +63,7 @@ CREATE TABLE tb_usuario (
 	cpf VARCHAR(11),
 	email VARCHAR(255) NOT NULL,
 	senha VARCHAR(255) NOT NULL,
-	nivel_acesso VARCHAR(11) NOT NULL DEFAULT 'operador',
+	nivel_acesso VARCHAR(11) NOT NULL DEFAULT 'OPERADOR',
 	cod_cd INTEGER,
 	cod_gestor INTEGER,
 
@@ -76,7 +76,7 @@ CREATE TABLE tb_usuario (
 	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
 		REFERENCES tb_usuario(id, cod_cd),
 	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
-	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin', 'super_admin'))
+	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('OPERADOR', 'GESTOR', 'ADMIN', 'SUPER_ADMIN'))
 );
 
 CREATE TABLE tb_solicitacao_suporte (
@@ -84,7 +84,7 @@ CREATE TABLE tb_solicitacao_suporte (
 	cod_usuario_solicitante INTEGER NOT NULL,
 	categoria VARCHAR(20) NOT NULL,
 	descricao TEXT NOT NULL,
-	status VARCHAR(20) NOT NULL DEFAULT 'registrado',
+	status VARCHAR(20) NOT NULL DEFAULT 'REGISTRADO',
 	data_hora_abertura TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	data_hora_encerramento TIMESTAMP,
 	resposta TEXT,
@@ -96,9 +96,9 @@ CREATE TABLE tb_solicitacao_suporte (
 	CONSTRAINT fk_solicitacao_suporte_responsavel
 		FOREIGN KEY (cod_usuario_responsavel) REFERENCES tb_usuario(id),
 	CONSTRAINT ck_solicitacao_suporte_categoria
-		CHECK (categoria IN ('dúvida', 'sugestão', 'reclamação', 'outro')),
+		CHECK (categoria IN ('DUVIDA', 'SUGESTAO', 'RECLAMACAO', 'OUTRO')),
 	CONSTRAINT ck_solicitacao_suporte_status
-		CHECK (status IN ('registrado', 'em_atendimento', 'atendido')),
+		CHECK (status IN ('REGISTRADO', 'EM_ATENDIMENTO', 'ATENDIDO')),
 	CONSTRAINT ck_solicitacao_suporte_encerramento
 		CHECK (
 			data_hora_encerramento IS NULL
@@ -155,13 +155,13 @@ CREATE TABLE tb_lote (
 	cod_categoria INTEGER NOT NULL,
 	data_fabricacao DATE NOT NULL,
 	data_validade DATE NOT NULL,
-	status VARCHAR(20) NOT NULL DEFAULT 'ativo',
+	status VARCHAR(20) NOT NULL DEFAULT 'ATIVO',
 
 	CONSTRAINT pk_lote PRIMARY KEY (id),
 	CONSTRAINT uq_lote_codigo UNIQUE (codigo_lote),
 	CONSTRAINT fk_lote_categoria FOREIGN KEY (cod_categoria) REFERENCES tb_categoria(id),
 	CONSTRAINT ck_lote_datas CHECK (data_validade >= data_fabricacao),
-	CONSTRAINT ck_lote_status CHECK (status IN ('ativo', 'bloqueado', 'expedido', 'vencido'))
+	CONSTRAINT ck_lote_status CHECK (status IN ('ATIVO', 'BLOQUEADO', 'EXPEDIDO', 'VENDIDO'))
 );
 
 CREATE TABLE tb_lote_camara_frigorifica (
@@ -181,18 +181,18 @@ CREATE TABLE tb_alerta (
 	id SERIAL,
 	cod_camara_frigorifica INTEGER NOT NULL,
 	vida_util_referencia_horas DECIMAL(7,2),
-	nivel_atual VARCHAR(8) NOT NULL DEFAULT 'operador',
+	nivel_atual VARCHAR(8) NOT NULL DEFAULT 'OPERADOR',
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	tipo VARCHAR(100) NOT NULL DEFAULT 'temperatura_fora_padrao',
+	tipo VARCHAR(100) NOT NULL DEFAULT 'TEMPERATURA_FORA_PADRAO',
 	nivel_gravidade VARCHAR(100) NOT NULL,
 	status VARCHAR(100) NOT NULL,
 
 	CONSTRAINT pk_alerta PRIMARY KEY (id),
 	CONSTRAINT fk_alerta_camara_frigorifica FOREIGN KEY (cod_camara_frigorifica) REFERENCES tb_camara_frigorifica(id),
-	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('operador', 'gestor', 'admin')),
-	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('baixa', 'atenção', 'urgente', 'crítica')),
-	CONSTRAINT ck_alerta_status CHECK (status IN ('ativo', 'reconhecido', 'resolvido')),
-	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('temperatura_fora_padrao'))
+	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('OPERADOR', 'GESTOR', 'ADMIN')),
+	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('BAIXA', 'ATENCAO', 'URGENTE', 'CRITICA')),
+	CONSTRAINT ck_alerta_status CHECK (status IN ('ATIVO', 'RECONHECIDO', 'RESOLVIDO')),
+	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('TEMPERATURA_FORA_PADRAO'))
 );
 
 CREATE TABLE tb_notificacao_alerta (
@@ -231,7 +231,7 @@ CREATE TABLE tb_atendimento (
 	CONSTRAINT pk_atendimento PRIMARY KEY (id),
 	CONSTRAINT fk_atendimento_alerta FOREIGN KEY (cod_alerta) REFERENCES tb_alerta(id),
 	CONSTRAINT fk_atendimento_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id),
-	CONSTRAINT ck_atendimento_status CHECK (status IN ('pendente', 'em_andamento', 'resolvido'))
+	CONSTRAINT ck_atendimento_status CHECK (status IN ('PENDENTE', 'EM_ANDAMENTO', 'RESOLVIDO'))
 );
 
 CREATE TABLE tb_justificativa (
@@ -256,7 +256,7 @@ CREATE TABLE tb_relatorio (
 
 	CONSTRAINT pk_relatorio PRIMARY KEY (id),
 	CONSTRAINT fk_relatorio_usuario FOREIGN KEY (cod_usuario_gerador) REFERENCES tb_usuario(id),
-	CONSTRAINT ck_relatorio_status CHECK (status IN ('gerado', 'assinado', 'arquivado'))
+	CONSTRAINT ck_relatorio_status CHECK (status IN ('GERADO', 'ASSINADO', 'ARQUIVADO'))
 );
 
 CREATE TABLE tb_assinatura (

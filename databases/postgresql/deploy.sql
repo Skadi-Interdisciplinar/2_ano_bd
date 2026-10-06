@@ -1,6 +1,7 @@
 -- ====================================================================
 -- DEPLOY: schemas.sql
 -- ====================================================================
+
 DROP TABLE IF EXISTS tb_assinatura CASCADE;
 DROP TABLE IF EXISTS tb_relatorio CASCADE;
 DROP TABLE IF EXISTS tb_controle_rpa CASCADE;
@@ -66,7 +67,7 @@ CREATE TABLE tb_usuario (
 	cpf VARCHAR(11),
 	email VARCHAR(255) NOT NULL,
 	senha VARCHAR(255) NOT NULL,
-	nivel_acesso VARCHAR(11) NOT NULL DEFAULT 'operador',
+	nivel_acesso VARCHAR(11) NOT NULL DEFAULT 'OPERADOR',
 	cod_cd INTEGER,
 	cod_gestor INTEGER,
 
@@ -79,7 +80,7 @@ CREATE TABLE tb_usuario (
 	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
 		REFERENCES tb_usuario(id, cod_cd),
 	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
-	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('operador', 'gestor', 'admin', 'super_admin'))
+	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('OPERADOR', 'GESTOR', 'ADMIN', 'SUPER_ADMIN'))
 );
 
 CREATE TABLE tb_solicitacao_suporte (
@@ -87,7 +88,7 @@ CREATE TABLE tb_solicitacao_suporte (
 	cod_usuario_solicitante INTEGER NOT NULL,
 	categoria VARCHAR(20) NOT NULL,
 	descricao TEXT NOT NULL,
-	status VARCHAR(20) NOT NULL DEFAULT 'registrado',
+	status VARCHAR(20) NOT NULL DEFAULT 'REGISTRADO',
 	data_hora_abertura TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	data_hora_encerramento TIMESTAMP,
 	resposta TEXT,
@@ -99,9 +100,9 @@ CREATE TABLE tb_solicitacao_suporte (
 	CONSTRAINT fk_solicitacao_suporte_responsavel
 		FOREIGN KEY (cod_usuario_responsavel) REFERENCES tb_usuario(id),
 	CONSTRAINT ck_solicitacao_suporte_categoria
-		CHECK (categoria IN ('dúvida', 'sugestão', 'reclamação', 'outro')),
+		CHECK (categoria IN ('DUVIDA', 'SUGESTAO', 'RECLAMACAO', 'OUTRO')),
 	CONSTRAINT ck_solicitacao_suporte_status
-		CHECK (status IN ('registrado', 'em_atendimento', 'atendido')),
+		CHECK (status IN ('REGISTRADO', 'EM_ATENDIMENTO', 'ATENDIDO')),
 	CONSTRAINT ck_solicitacao_suporte_encerramento
 		CHECK (
 			data_hora_encerramento IS NULL
@@ -158,13 +159,13 @@ CREATE TABLE tb_lote (
 	cod_categoria INTEGER NOT NULL,
 	data_fabricacao DATE NOT NULL,
 	data_validade DATE NOT NULL,
-	status VARCHAR(20) NOT NULL DEFAULT 'ativo',
+	status VARCHAR(20) NOT NULL DEFAULT 'ATIVO',
 
 	CONSTRAINT pk_lote PRIMARY KEY (id),
 	CONSTRAINT uq_lote_codigo UNIQUE (codigo_lote),
 	CONSTRAINT fk_lote_categoria FOREIGN KEY (cod_categoria) REFERENCES tb_categoria(id),
 	CONSTRAINT ck_lote_datas CHECK (data_validade >= data_fabricacao),
-	CONSTRAINT ck_lote_status CHECK (status IN ('ativo', 'bloqueado', 'expedido', 'vencido'))
+	CONSTRAINT ck_lote_status CHECK (status IN ('ATIVO', 'BLOQUEADO', 'EXPEDIDO', 'VENDIDO'))
 );
 
 CREATE TABLE tb_lote_camara_frigorifica (
@@ -184,18 +185,18 @@ CREATE TABLE tb_alerta (
 	id SERIAL,
 	cod_camara_frigorifica INTEGER NOT NULL,
 	vida_util_referencia_horas DECIMAL(7,2),
-	nivel_atual VARCHAR(8) NOT NULL DEFAULT 'operador',
+	nivel_atual VARCHAR(8) NOT NULL DEFAULT 'OPERADOR',
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	tipo VARCHAR(100) NOT NULL DEFAULT 'temperatura_fora_padrao',
+	tipo VARCHAR(100) NOT NULL DEFAULT 'TEMPERATURA_FORA_PADRAO',
 	nivel_gravidade VARCHAR(100) NOT NULL,
 	status VARCHAR(100) NOT NULL,
 
 	CONSTRAINT pk_alerta PRIMARY KEY (id),
 	CONSTRAINT fk_alerta_camara_frigorifica FOREIGN KEY (cod_camara_frigorifica) REFERENCES tb_camara_frigorifica(id),
-	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('operador', 'gestor', 'admin')),
-	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('baixa', 'atenção', 'urgente', 'crítica')),
-	CONSTRAINT ck_alerta_status CHECK (status IN ('ativo', 'reconhecido', 'resolvido')),
-	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('temperatura_fora_padrao'))
+	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('OPERADOR', 'GESTOR', 'ADMIN')),
+	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('BAIXA', 'ATENCAO', 'URGENTE', 'CRITICA')),
+	CONSTRAINT ck_alerta_status CHECK (status IN ('ATIVO', 'RECONHECIDO', 'RESOLVIDO')),
+	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('TEMPERATURA_FORA_PADRAO'))
 );
 
 CREATE TABLE tb_notificacao_alerta (
@@ -234,7 +235,7 @@ CREATE TABLE tb_atendimento (
 	CONSTRAINT pk_atendimento PRIMARY KEY (id),
 	CONSTRAINT fk_atendimento_alerta FOREIGN KEY (cod_alerta) REFERENCES tb_alerta(id),
 	CONSTRAINT fk_atendimento_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id),
-	CONSTRAINT ck_atendimento_status CHECK (status IN ('pendente', 'em_andamento', 'resolvido'))
+	CONSTRAINT ck_atendimento_status CHECK (status IN ('PENDENTE', 'EM_ANDAMENTO', 'RESOLVIDO'))
 );
 
 CREATE TABLE tb_justificativa (
@@ -259,7 +260,7 @@ CREATE TABLE tb_relatorio (
 
 	CONSTRAINT pk_relatorio PRIMARY KEY (id),
 	CONSTRAINT fk_relatorio_usuario FOREIGN KEY (cod_usuario_gerador) REFERENCES tb_usuario(id),
-	CONSTRAINT ck_relatorio_status CHECK (status IN ('gerado', 'assinado', 'arquivado'))
+	CONSTRAINT ck_relatorio_status CHECK (status IN ('GERADO', 'ASSINADO', 'ARQUIVADO'))
 );
 
 CREATE TABLE tb_assinatura (
@@ -281,6 +282,7 @@ CREATE TABLE tb_assinatura (
 -- ====================================================================
 -- DEPLOY: functions.sql
 -- ====================================================================
+
 CREATE OR REPLACE FUNCTION fn_calcular_vida_util_camara(
     p_cod_camara INTEGER
 )
@@ -292,7 +294,7 @@ BEGIN
     INTO v_vida_util
     FROM tb_lote_camara_frigorifica lr
     JOIN tb_lote l
-        ON l.id = lr.cod_lote AND l.status = 'ativo'
+        ON l.id = lr.cod_lote AND l.status = 'ATIVO'
     JOIN tb_categoria c
         ON c.id = l.cod_categoria
     WHERE lr.cod_camara_frigorifica = p_cod_camara AND lr.data_saida IS NULL;
@@ -368,13 +370,13 @@ BEGIN
     END IF;
 
     IF v_diferenca <= 1 THEN
-        RETURN 'baixa';
+        RETURN 'BAIXA';
     ELSIF v_diferenca <= 3 THEN
-        RETURN 'atenção';
+        RETURN 'ATENCAO';
     ELSIF v_diferenca <= 5 THEN
-        RETURN 'urgente';
+        RETURN 'URGENTE';
     ELSE
-        RETURN 'crítica';
+        RETURN 'CRITICA';
     END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -409,6 +411,7 @@ $$ LANGUAGE plpgsql;
 -- ====================================================================
 -- DEPLOY: procedures.sql
 -- ====================================================================
+
 CREATE OR REPLACE PROCEDURE sp_reconhecer_alerta(
     p_cod_alerta INTEGER,
     p_cod_usuario INTEGER
@@ -434,16 +437,16 @@ BEGIN
     UPDATE tb_atendimento
     SET cod_usuario = p_cod_usuario,
         data_hora_reconhecimento = CURRENT_TIMESTAMP,
-        status = 'em_andamento'
-    WHERE cod_alerta = p_cod_alerta AND status = 'pendente';
+        status = 'EM_ANDAMENTO'
+    WHERE cod_alerta = p_cod_alerta AND status = 'PENDENTE';
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Nenhum atendimento pendente encontrado para o alerta %.', p_cod_alerta;
     END IF;
 
     UPDATE tb_alerta
-    SET status = 'reconhecido'
-    WHERE id = p_cod_alerta AND status = 'ativo';
+    SET status = 'RECONHECIDO'
+    WHERE id = p_cod_alerta AND status = 'ATIVO';
 END;
 $$;
 
@@ -462,7 +465,7 @@ BEGIN
         RAISE EXCEPTION 'Alerta % não encontrado.', p_cod_alerta;
     END IF;
 
-    IF p_nivel NOT IN ('operador', 'gestor', 'admin') THEN
+    IF p_nivel NOT IN ('OPERADOR', 'GESTOR', 'ADMIN') THEN
         RAISE EXCEPTION 'Nível de acesso inválido: %.', p_nivel;
     END IF;
 
@@ -487,17 +490,17 @@ BEGIN
     FOR v_alerta IN
         SELECT id, nivel_atual, data_hora
         FROM tb_alerta
-        WHERE status = 'ativo' AND nivel_atual IN ('operador', 'gestor')
+        WHERE status = 'ATIVO' AND nivel_atual IN ('OPERADOR', 'GESTOR')
     LOOP
         v_nivel_novo := NULL;
 
         IF CURRENT_TIMESTAMP >= v_alerta.data_hora
             + fn_calcular_prazo_escalonamento(v_alerta.id, 70) * INTERVAL '1 hour' THEN
-            v_nivel_novo := 'admin';
+            v_nivel_novo := 'ADMIN';
         ELSIF CURRENT_TIMESTAMP >= v_alerta.data_hora
             + fn_calcular_prazo_escalonamento(v_alerta.id, 40) * INTERVAL '1 hour'
-            AND v_alerta.nivel_atual = 'operador' THEN
-            v_nivel_novo := 'gestor';
+            AND v_alerta.nivel_atual = 'OPERADOR' THEN
+            v_nivel_novo := 'GESTOR';
         END IF;
 
         IF v_nivel_novo IS NOT NULL THEN
@@ -553,11 +556,11 @@ BEGIN
         RAISE EXCEPTION 'Usuário executor % não encontrado.', v_cod_executor;
     END IF;
 
-    IF p_nivel_acesso NOT IN ('operador', 'gestor', 'admin', 'super_admin') THEN
+    IF p_nivel_acesso NOT IN ('OPERADOR', 'GESTOR', 'ADMIN', 'SUPER_ADMIN') THEN
         RAISE EXCEPTION 'Nível de acesso inválido para cadastro: %.', p_nivel_acesso;
     END IF;
 
-    IF p_nivel_acesso = 'super_admin' THEN
+    IF p_nivel_acesso = 'SUPER_ADMIN' THEN
         IF p_cpf IS NOT NULL
            OR p_cod_cd IS NOT NULL
            OR p_cod_gestor IS NOT NULL THEN
@@ -571,30 +574,30 @@ BEGIN
         RAISE EXCEPTION 'O CD do novo usuário é obrigatório.';
     END IF;
 
-    IF p_nivel_acesso = 'operador' AND p_cod_gestor IS NULL THEN
+    IF p_nivel_acesso = 'OPERADOR' AND p_cod_gestor IS NULL THEN
         RAISE EXCEPTION
             'Usuário operador deve possuir gestor responsável.';
     END IF;
 
-    IF p_nivel_acesso <> 'operador' AND p_cod_gestor IS NOT NULL THEN
+    IF p_nivel_acesso <> 'OPERADOR' AND p_cod_gestor IS NOT NULL THEN
         RAISE EXCEPTION
             'Somente operadores podem possuir gestor responsável.';
     END IF;
 
     -- Super ADM pode cadastrar outro Super ADM ou um ADM de um CD.
-    IF v_nivel_executor = 'super_admin' THEN
-        IF p_nivel_acesso NOT IN ('super_admin', 'admin') THEN
+    IF v_nivel_executor = 'SUPER_ADMIN' THEN
+        IF p_nivel_acesso NOT IN ('SUPER_ADMIN', 'ADMIN') THEN
             RAISE EXCEPTION
                 'Super ADM pode cadastrar somente super_administradores ou administradores.';
         END IF;
 
     -- ADM cadastra Gestor e Operador apenas no próprio CD.
-    ELSIF v_nivel_executor = 'admin' THEN
+    ELSIF v_nivel_executor = 'ADMIN' THEN
         IF v_cd_executor IS DISTINCT FROM p_cod_cd THEN
             RAISE EXCEPTION 'O administrador só pode cadastrar usuários do próprio CD.';
         END IF;
 
-        IF p_nivel_acesso NOT IN ('gestor', 'operador') THEN
+        IF p_nivel_acesso NOT IN ('GESTOR', 'OPERADOR') THEN
             RAISE EXCEPTION
                 'Administrador pode cadastrar somente gestores e operadores.';
         END IF;
@@ -616,6 +619,7 @@ $$;
 -- ====================================================================
 -- DEPLOY: triggers.sql
 -- ====================================================================
+
 DROP TRIGGER IF EXISTS trg_criar_atendimento_pendente ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_resolver_atendimento_por_justificativa ON tb_justificativa;
 DROP TRIGGER IF EXISTS trg_validar_temperatura_categoria_camara ON tb_lote_camara_frigorifica;
@@ -628,7 +632,7 @@ CREATE OR REPLACE FUNCTION fn_validar_gestor_usuario()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Super ADM administra a plataforma e não possui CPF, CD ou gestor.
-    IF NEW.nivel_acesso = 'super_admin' THEN
+    IF NEW.nivel_acesso = 'SUPER_ADMIN' THEN
         IF NEW.cpf IS NOT NULL THEN
             RAISE EXCEPTION
                 'Usuário super_admin não pode possuir CPF.';
@@ -661,7 +665,7 @@ BEGIN
     END IF;
 
     -- ADM e Gestor não possuem gestor responsável.
-    IF NEW.nivel_acesso IN ('admin', 'gestor')
+    IF NEW.nivel_acesso IN ('ADMIN', 'GESTOR')
        AND NEW.cod_gestor IS NOT NULL THEN
         RAISE EXCEPTION
             'Usuário com nível % não pode possuir gestor responsável.',
@@ -669,19 +673,19 @@ BEGIN
     END IF;
 
     -- Operador deve possuir gestor responsável.
-    IF NEW.nivel_acesso = 'operador'
+    IF NEW.nivel_acesso = 'OPERADOR'
        AND NEW.cod_gestor IS NULL THEN
         RAISE EXCEPTION
             'Usuário operador deve possuir gestor responsável.';
     END IF;
 
     -- O gestor do operador deve ser gestor e pertencer ao mesmo CD.
-    IF NEW.nivel_acesso = 'operador'
+    IF NEW.nivel_acesso = 'OPERADOR'
        AND NOT EXISTS (
             SELECT 1
             FROM tb_usuario gestor
             WHERE gestor.id = NEW.cod_gestor
-              AND gestor.nivel_acesso = 'gestor'
+              AND gestor.nivel_acesso = 'GESTOR'
               AND gestor.cod_cd = NEW.cod_cd
        ) THEN
         RAISE EXCEPTION
@@ -692,8 +696,8 @@ BEGIN
 
     -- Um gestor não pode deixar de ser gestor enquanto possuir operadores vinculados.
     IF TG_OP = 'UPDATE'
-       AND OLD.nivel_acesso = 'gestor'
-       AND NEW.nivel_acesso <> 'gestor'
+       AND OLD.nivel_acesso = 'GESTOR'
+       AND NEW.nivel_acesso <> 'GESTOR'
        AND EXISTS (
             SELECT 1
             FROM tb_usuario subordinado
@@ -723,25 +727,25 @@ BEGIN
             SELECT 1
             FROM tb_usuario usuario_responsavel
             WHERE usuario_responsavel.id = NEW.cod_usuario_responsavel
-              AND usuario_responsavel.nivel_acesso = 'super_admin'
+              AND usuario_responsavel.nivel_acesso = 'SUPER_ADMIN'
        ) THEN
         RAISE EXCEPTION
             'O responsável da solicitação de suporte deve possuir nível super_admin.';
     END IF;
 
-    IF TG_OP = 'INSERT' AND NEW.status <> 'registrado' THEN
+    IF TG_OP = 'INSERT' AND NEW.status <> 'REGISTRADO' THEN
         RAISE EXCEPTION
             'Uma solicitação de suporte deve ser criada com status registrado.';
     END IF;
 
-    IF NEW.status = 'registrado' THEN
+    IF NEW.status = 'REGISTRADO' THEN
         IF NEW.cod_usuario_responsavel IS NOT NULL
            OR NEW.resposta IS NOT NULL
            OR NEW.data_hora_encerramento IS NOT NULL THEN
             RAISE EXCEPTION
                 'Uma solicitação registrada não pode possuir responsável, resposta ou data de encerramento.';
         END IF;
-    ELSIF NEW.status = 'em_atendimento' THEN
+    ELSIF NEW.status = 'EM_ATENDIMENTO' THEN
         IF NEW.cod_usuario_responsavel IS NULL THEN
             RAISE EXCEPTION
                 'Uma solicitação em atendimento deve possuir um responsável super_admin.';
@@ -751,7 +755,7 @@ BEGIN
             RAISE EXCEPTION
                 'Uma solicitação em atendimento não pode possuir data de encerramento.';
         END IF;
-    ELSIF NEW.status = 'atendido' THEN
+    ELSIF NEW.status = 'ATENDIDO' THEN
         IF NEW.cod_usuario_responsavel IS NULL
            OR NEW.resposta IS NULL
            OR NEW.data_hora_encerramento IS NULL THEN
@@ -761,19 +765,19 @@ BEGIN
     END IF;
 
     IF TG_OP = 'UPDATE' THEN
-        IF OLD.status = 'registrado'
-           AND NEW.status NOT IN ('registrado', 'em_atendimento') THEN
+        IF OLD.status = 'REGISTRADO'
+           AND NEW.status NOT IN ('REGISTRADO', 'EM_ATENDIMENTO') THEN
             RAISE EXCEPTION
                 'A solicitação deve passar de registrado para em_atendimento antes de ser atendida.';
         END IF;
 
-        IF OLD.status = 'em_atendimento'
-           AND NEW.status NOT IN ('em_atendimento', 'atendido') THEN
+        IF OLD.status = 'EM_ATENDIMENTO'
+           AND NEW.status NOT IN ('EM_ATENDIMENTO', 'ATENDIDO') THEN
             RAISE EXCEPTION
                 'A solicitação em atendimento só pode permanecer nesse status ou ser atendida.';
         END IF;
 
-        IF OLD.status = 'atendido' AND NEW.status <> 'atendido' THEN
+        IF OLD.status = 'ATENDIDO' AND NEW.status <> 'ATENDIDO' THEN
             RAISE EXCEPTION
                 'Uma solicitação atendida não pode retornar a um status anterior.';
         END IF;
@@ -794,7 +798,7 @@ CREATE OR REPLACE FUNCTION fn_criar_atendimento_pendente()
 RETURNS TRIGGER AS $$
 BEGIN
     INSERT INTO tb_atendimento (cod_alerta, status)
-    VALUES (NEW.id, 'pendente');
+    VALUES (NEW.id, 'PENDENTE');
 
     RETURN NEW;
 END;
@@ -834,7 +838,7 @@ BEGIN
             NEW.cod_atendimento;
     END IF;
 
-    IF v_status_atendimento <> 'em_andamento' THEN
+    IF v_status_atendimento <> 'EM_ANDAMENTO' THEN
         RAISE EXCEPTION
             'O atendimento precisa estar em andamento para ser resolvido.';
     END IF;
@@ -845,12 +849,12 @@ BEGIN
     ) THEN
 
         UPDATE tb_atendimento
-           SET status = 'resolvido',
+           SET status = 'RESOLVIDO',
                data_hora_resolucao = CURRENT_TIMESTAMP
          WHERE id = NEW.cod_atendimento;
 
         UPDATE tb_alerta
-           SET status = 'resolvido'
+           SET status = 'RESOLVIDO'
          WHERE id = v_cod_alerta;
     END IF;
 
@@ -945,10 +949,10 @@ BEGIN
         VALUES (
             v_camara,
             v_vida_util,
-            'operador',
+            'OPERADOR',
             NEW.data_hora,
             v_gravidade,
-            'ativo'
+            'ATIVO'
         )
         RETURNING id INTO v_alerta;
 
@@ -956,7 +960,7 @@ BEGIN
            SET cod_alerta = v_alerta
          WHERE id = NEW.id;
 
-        CALL sp_notificar_nivel_acesso(v_alerta, 'operador');
+        CALL sp_notificar_nivel_acesso(v_alerta, 'OPERADOR');
     END IF;
 
     RETURN NEW;
@@ -976,7 +980,7 @@ BEGIN
     v_horas_prazo := fn_calcular_prazo_escalonamento(NEW.id, 40);
 
     PERFORM pg_notify(
-        'novo_alerta',
+        'VOVO_ALERTA',
         json_build_object(
             'id_alerta', NEW.id,
             'prazo_epoch',
@@ -998,6 +1002,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_notificar_novo_alerta();
 -- ====================================================================
 -- DEPLOY: audit.sql
 -- ====================================================================
+
 DROP TABLE IF EXISTS tb_log_acesso;
 DROP TABLE IF EXISTS tb_log_auditoria;
 DROP TABLE IF EXISTS tb_log_acesso_relatorio;
@@ -1049,7 +1054,7 @@ CREATE TABLE tb_log_acesso_relatorio (
 	CONSTRAINT pk_log_acesso_relatorio PRIMARY KEY (id),
 	CONSTRAINT fk_log_acesso_relatorio_relatorio FOREIGN KEY (cod_relatorio) REFERENCES tb_relatorio(id),
 	CONSTRAINT fk_log_acesso_relatorio_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id),
-	CONSTRAINT ck_log_acesso_relatorio_acao CHECK (acao IN ('visualizou', 'baixou'))
+	CONSTRAINT ck_log_acesso_relatorio_acao CHECK (acao IN ('VISUALIZOU', 'BAIXOU'))
 );
 
 CREATE TABLE tb_log_escalonamento (
@@ -1057,7 +1062,7 @@ CREATE TABLE tb_log_escalonamento (
 	cod_alerta INTEGER NOT NULL,
 	nivel_anterior VARCHAR(8),
 	nivel_novo VARCHAR(8) NOT NULL,
-	motivo VARCHAR(50) NOT NULL DEFAULT 'tempo_limite_excedido',
+	motivo VARCHAR(50) NOT NULL DEFAULT 'TEMPO_LIMITE_EXCEDIDO',
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
 	CONSTRAINT pk_log_escalonamento PRIMARY KEY (id),
@@ -1134,9 +1139,11 @@ CREATE TRIGGER trg_log_escalonamento
 AFTER UPDATE OF nivel_atual ON tb_alerta
 FOR EACH ROW EXECUTE FUNCTION fn_log_escalonamento();
 
+
 -- ====================================================================
 -- DEPLOY: catalogo-dados.sql
 -- ====================================================================
+
 -- ====================================================================
 -- LIMPEZA E CRIAÇÃO DA TABELA
 -- Tabela centralizadora do Catálogo de Dados corporativo.
@@ -1155,13 +1162,13 @@ CREATE TABLE tb_catalogo_dados (
 	chave VARCHAR(2),
 	descricao TEXT NOT NULL,
 	regra_negocio TEXT,
-	nivel_acesso_leitura VARCHAR(8) NOT NULL DEFAULT 'operador',
+	nivel_acesso_leitura VARCHAR(8) NOT NULL DEFAULT 'OPERADOR',
 	dado_sensivel BOOLEAN NOT NULL DEFAULT FALSE,
 
 	CONSTRAINT pk_catalogo_dados PRIMARY KEY (id),
 	CONSTRAINT uq_catalogo_tabela_coluna UNIQUE (nome_tabela, nome_coluna),
 	CONSTRAINT ck_catalogo_chave CHECK (chave IN ('PK', 'FK','NK')),
-	CONSTRAINT ck_catalogo_nivel_acesso CHECK (nivel_acesso_leitura IN ('operador', 'gestor', 'admin'))
+	CONSTRAINT ck_catalogo_nivel_acesso CHECK (nivel_acesso_leitura IN ('OPERADOR', 'GESTOR', 'ADMIN'))
 );
 
 
@@ -1173,130 +1180,131 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 -- tb_estado
 -- ==============================================
-('tb_estado', 'estado', 'CHAR(2)', TRUE, 'NK', 'Sigla da unidade federativa', 'Única no sistema; armazenada no padrão de duas letras', 'operador', FALSE),
+('tb_estado', 'estado', 'CHAR(2)', TRUE, 'NK', 'Sigla da unidade federativa', 'Única no sistema; armazenada no padrão de duas letras', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_cd
 -- ==============================================
-('tb_cd', 'id', 'SERIAL', TRUE, 'PK', 'Identificador único do centro de distribuição', NULL, 'operador', FALSE),
-('tb_cd', 'cnpj', 'VARCHAR(14)', TRUE, 'NK', 'CNPJ do centro de distribuição', 'Único no sistema, sem formatação (apenas dígitos)', 'gestor', FALSE),
+('tb_cd', 'id', 'SERIAL', TRUE, 'PK', 'Identificador único do centro de distribuição', NULL, 'OPERADOR', FALSE),
+('tb_cd', 'cnpj', 'VARCHAR(14)', TRUE, 'NK', 'CNPJ do centro de distribuição', 'Único no sistema, sem formatação (apenas dígitos)', 'GESTOR', FALSE),
 
 -- ==============================================
 -- tb_usuario
 -- ==============================================
-('tb_usuario', 'id', 'SERIAL', TRUE, 'PK', 'Identificador único do funcionário', NULL, 'operador', FALSE),
-('tb_usuario', 'username', 'VARCHAR(50)', TRUE, 'NK', 'Nome de usuário para autenticação', 'Único no sistema; usado no login da aplicação', 'admin', TRUE),
-('tb_usuario', 'cpf', 'VARCHAR(11)', TRUE, 'NK', 'CPF do funcionário', 'Único no sistema; dado pessoal protegido por LGPD', 'admin', TRUE),
-('tb_usuario', 'email', 'VARCHAR(255)', TRUE, 'NK', 'E-mail do funcionário', 'Único no sistema; usado para login e notificações', 'admin', TRUE),
-('tb_usuario', 'senha', 'VARCHAR(255)', TRUE, NULL, 'Hash da senha de acesso', 'Nunca armazenada em texto plano; nunca exposta em relatórios ou exports', 'admin', TRUE),
-('tb_usuario', 'nivel_acesso', 'VARCHAR(8)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: operador, gestor e admin; acessos técnicos ao banco são controlados por roles PostgreSQL', 'gestor', FALSE),
-('tb_usuario', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o funcionário pertence', 'Referencia tb_cd(id)', 'operador', FALSE),
-('tb_usuario', 'cod_gestor', 'INTEGER', FALSE, 'FK', 'Gestor responsável pelo funcionário', 'Opcional; deve referenciar um usuário com nível gestor e do mesmo CD', 'gestor', FALSE),
+('tb_usuario', 'id', 'SERIAL', TRUE, 'PK', 'Identificador único do funcionário', NULL, 'OPERADOR', FALSE),
+('tb_usuario', 'username', 'VARCHAR(50)', TRUE, 'NK', 'Nome de usuário para autenticação', 'Único no sistema; usado no login da aplicação', 'ADMIN', TRUE),
+('tb_usuario', 'cpf', 'VARCHAR(11)', TRUE, 'NK', 'CPF do funcionário', 'Único no sistema; dado pessoal protegido por LGPD', 'ADMIN', TRUE),
+('tb_usuario', 'email', 'VARCHAR(255)', TRUE, 'NK', 'E-mail do funcionário', 'Único no sistema; usado para login e notificações', 'ADMIN', TRUE),
+('tb_usuario', 'senha', 'VARCHAR(255)', TRUE, NULL, 'Hash da senha de acesso', 'Nunca armazenada em texto plano; nunca exposta em relatórios ou exports', 'ADMIN', TRUE),
+('tb_usuario', 'nivel_acesso', 'VARCHAR(11)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: OPERADOR, GESTOR, ADMIN e SUPER_ADMIN; acessos técnicos ao banco são controlados por roles PostgreSQL', 'GESTOR', FALSE),
+('tb_usuario', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o funcionário pertence', 'Referencia tb_cd(id)', 'OPERADOR', FALSE),
+('tb_usuario', 'cod_gestor', 'INTEGER', FALSE, 'FK', 'Gestor responsável pelo funcionário', 'Opcional; deve referenciar um usuário com nível gestor e do mesmo CD', 'GESTOR', FALSE),
 
 -- ==============================================
 -- tb_categoria
 -- ==============================================
-('tb_categoria', 'nome', 'VARCHAR(150)', TRUE, 'NK', 'Categoria de armazenamento', 'Única no sistema; concentra os parâmetros comuns aos lotes', 'operador', FALSE),
-('tb_categoria', 'temperatura_min', 'DECIMAL(5,2)', TRUE, NULL, 'Limite mínimo de temperatura da categoria', 'Deve ser maior ou igual ao limite mínimo da câmara para que o lote possa ser armazenado nela', 'operador', FALSE),
-('tb_categoria', 'temperatura_max', 'DECIMAL(5,2)', TRUE, NULL, 'Limite máximo de temperatura da categoria', 'Deve ser menor ou igual ao limite máximo da câmara para que o lote possa ser armazenado nela', 'operador', FALSE),
-('tb_categoria', 'vida_util_horas', 'DECIMAL(7,2)', TRUE, NULL, 'Vida útil da categoria em horas', 'Base direta do escalonamento do alerta', 'operador', FALSE),
+('tb_categoria', 'nome', 'VARCHAR(150)', TRUE, 'NK', 'Categoria de armazenamento', 'Única no sistema; concentra os parâmetros comuns aos lotes', 'OPERADOR', FALSE),
+('tb_categoria', 'temperatura_min', 'DECIMAL(5,2)', TRUE, NULL, 'Limite mínimo de temperatura da categoria', 'Deve ser maior ou igual ao limite mínimo da câmara para que o lote possa ser armazenado nela', 'OPERADOR', FALSE),
+('tb_categoria', 'temperatura_max', 'DECIMAL(5,2)', TRUE, NULL, 'Limite máximo de temperatura da categoria', 'Deve ser menor ou igual ao limite máximo da câmara para que o lote possa ser armazenado nela', 'OPERADOR', FALSE),
+('tb_categoria', 'vida_util_horas', 'DECIMAL(7,2)', TRUE, NULL, 'Vida útil da categoria em horas', 'Base direta do escalonamento do alerta', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_lote
 -- ==============================================
-('tb_lote', 'codigo_lote', 'VARCHAR(50)', TRUE, 'NK', 'Identificador operacional do lote', 'Único no sistema', 'operador', FALSE),
-('tb_lote', 'cod_categoria', 'INTEGER', TRUE, 'FK', 'Categoria do lote', 'Cada lote pertence a exatamente uma categoria', 'operador', FALSE),
-('tb_lote', 'data_fabricacao', 'DATE', TRUE, NULL, 'Data de fabricação do lote', 'Usada para rastreabilidade', 'operador', FALSE),
-('tb_lote', 'data_validade', 'DATE', TRUE, NULL, 'Data de validade do lote', 'Deve ser igual ou posterior à fabricação', 'operador', FALSE),
+('tb_lote', 'codigo_lote', 'VARCHAR(50)', TRUE, 'NK', 'Identificador operacional do lote', 'Único no sistema', 'OPERADOR', FALSE),
+('tb_lote', 'cod_categoria', 'INTEGER', TRUE, 'FK', 'Categoria do lote', 'Cada lote pertence a exatamente uma categoria', 'OPERADOR', FALSE),
+('tb_lote', 'data_fabricacao', 'DATE', TRUE, NULL, 'Data de fabricação do lote', 'Usada para rastreabilidade', 'OPERADOR', FALSE),
+('tb_lote', 'data_validade', 'DATE', TRUE, NULL, 'Data de validade do lote', 'Deve ser igual ou posterior à fabricação', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_lote_camara_frigorifica
 -- ==============================================
-('tb_lote_camara_frigorifica', 'cod_lote', 'INTEGER', TRUE, 'FK', 'Lote movimentado', 'Um lote pode passar por várias câmaras frigoríficas ao longo do tempo', 'operador', FALSE),
-('tb_lote_camara_frigorifica', 'cod_camara_frigorifica', 'INTEGER', TRUE, 'FK', 'Câmara frigorífica do lote', 'Apenas uma localização atual pode ficar aberta por lote', 'operador', FALSE),
-('tb_lote_camara_frigorifica', 'data_entrada', 'TIMESTAMP', TRUE, NULL, 'Entrada do lote na câmara frigorífica', 'Início do período de armazenamento', 'operador', FALSE),
-('tb_lote_camara_frigorifica', 'data_saida', 'TIMESTAMP', FALSE, NULL, 'Saída do lote da câmara frigorífica', 'NULL indica a localização atual', 'operador', FALSE),
+('tb_lote_camara_frigorifica', 'cod_lote', 'INTEGER', TRUE, 'FK', 'Lote movimentado', 'Um lote pode passar por várias câmaras frigoríficas ao longo do tempo', 'OPERADOR', FALSE),
+('tb_lote_camara_frigorifica', 'cod_camara_frigorifica', 'INTEGER', TRUE, 'FK', 'Câmara frigorífica do lote', 'Apenas uma localização atual pode ficar aberta por lote', 'OPERADOR', FALSE),
+('tb_lote_camara_frigorifica', 'data_entrada', 'TIMESTAMP', TRUE, NULL, 'Entrada do lote na câmara frigorífica', 'Início do período de armazenamento', 'OPERADOR', FALSE),
+('tb_lote_camara_frigorifica', 'data_saida', 'TIMESTAMP', FALSE, NULL, 'Saída do lote da câmara frigorífica', 'NULL indica a localização atual', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_camara_frigorifica
 -- ==============================================
-('tb_camara_frigorifica', 'cod_termometro', 'INTEGER', TRUE, 'FK', 'Termômetro instalado na câmara frigorífica', 'Relação 1:1 — cada termômetro pertence a exatamente uma câmara frigorífica (UNIQUE)', 'operador', FALSE),
+('tb_camara_frigorifica', 'cod_termometro', 'INTEGER', TRUE, 'FK', 'Termômetro instalado na câmara frigorífica', 'Relação 1:1 — cada termômetro pertence a exatamente uma câmara frigorífica (UNIQUE)', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_alerta
 -- ==============================================
-('tb_alerta', 'nivel_atual', 'VARCHAR(8)', TRUE, NULL, 'Cargo responsável pelo alerta no momento', 'Nasce como operador; muda automaticamente por escalonamento (trigger monitora esse campo)', 'operador', FALSE),
-('tb_alerta', 'cod_camara_frigorifica', 'INTEGER', TRUE, 'FK', 'Câmara frigorífica que originou o alerta', 'Todo alerta pertence à câmara que originou a ocorrência', 'operador', FALSE),
-('tb_alerta', 'vida_util_referencia_horas', 'DECIMAL(7,2)', FALSE, NULL, 'Menor vida útil entre os lotes ativos no momento do alerta', 'Base dos prazos fixos de escalonamento', 'gestor', FALSE),
-('tb_alerta', 'status', 'VARCHAR(100)', TRUE, NULL, 'Fase do atendimento do alerta', 'Não confundir com nivel_atual: status é sobre o atendimento (ativo/reconhecido/resolvido), nivel_atual é sobre o cargo responsável', 'operador', FALSE),
-('tb_alerta', 'nivel_gravidade', 'VARCHAR(100)', TRUE, NULL, 'Gravidade do alerta', 'Calculada via fn_calcular_gravidade_alerta: baixa, atenção, urgente ou crítica', 'operador', FALSE),
-('tb_alerta', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento de criação do alerta', 'Usado como referência para o escalonamento', 'operador', FALSE),
-('tb_alerta', 'tipo', 'VARCHAR(100)', TRUE, NULL, 'Tipo da ocorrência', 'Atualmente limitado a temperatura_fora_padrao', 'operador', FALSE),
+('tb_alerta', 'nivel_atual', 'VARCHAR(8)', TRUE, NULL, 'Cargo responsável pelo alerta no momento', 'Nasce como operador; muda automaticamente por escalonamento (trigger monitora esse campo)', 'OPERADOR', FALSE),
+('tb_alerta', 'cod_camara_frigorifica', 'INTEGER', TRUE, 'FK', 'Câmara frigorífica que originou o alerta', 'Todo alerta pertence à câmara que originou a ocorrência', 'OPERADOR', FALSE),
+('tb_alerta', 'vida_util_referencia_horas', 'DECIMAL(7,2)', FALSE, NULL, 'Menor vida útil entre os lotes ativos no momento do alerta', 'Base dos prazos fixos de escalonamento', 'GESTOR', FALSE),
+('tb_alerta', 'status', 'VARCHAR(100)', TRUE, NULL, 'Fase do atendimento do alerta', 'Não confundir com nivel_atual: status é sobre o atendimento (ATIVO/RECONHECIDO/RESOLVIDO), nivel_atual é sobre o cargo responsável', 'OPERADOR', FALSE),
+('tb_alerta', 'nivel_gravidade', 'VARCHAR(100)', TRUE, NULL, 'Gravidade do alerta', 'Calculada via fn_calcular_gravidade_alerta: BAIXA, ATENCAO, URGENTE ou CRITICA', 'OPERADOR', FALSE),
+('tb_alerta', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento de criação do alerta', 'Usado como referência para o escalonamento', 'OPERADOR', FALSE),
+('tb_alerta', 'tipo', 'VARCHAR(100)', TRUE, NULL, 'Tipo da ocorrência', 'Atualmente limitado a TEMPERATURA_FORA_PADRAO', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_notificacao_alerta
 -- ==============================================
-('tb_notificacao_alerta', 'cod_alerta', 'INTEGER', TRUE, 'FK', 'Alerta notificado', 'Relaciona a notificação ao alerta correspondente', 'operador', FALSE),
-('tb_notificacao_alerta', 'cod_usuario', 'INTEGER', TRUE, 'FK', 'Usuário notificado', 'Usuário do mesmo CD e nível de acesso do escalonamento', 'operador', FALSE),
-('tb_notificacao_alerta', 'data_hora_envio', 'TIMESTAMP', TRUE, NULL, 'Momento do registro da notificação', 'Usado para histórico de envio das notificações push', 'operador', FALSE),
+('tb_notificacao_alerta', 'cod_alerta', 'INTEGER', TRUE, 'FK', 'Alerta notificado', 'Relaciona a notificação ao alerta correspondente', 'OPERADOR', FALSE),
+('tb_notificacao_alerta', 'cod_usuario', 'INTEGER', TRUE, 'FK', 'Usuário notificado', 'Usuário do mesmo CD e nível de acesso do escalonamento', 'OPERADOR', FALSE),
+('tb_notificacao_alerta', 'data_hora_envio', 'TIMESTAMP', TRUE, NULL, 'Momento do registro da notificação', 'Usado para histórico de envio das notificações push', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_leitura_temperatura
 -- ==============================================
-('tb_leitura_temperatura', 'cod_termometro', 'INTEGER', TRUE, 'FK', 'Termômetro de origem da leitura', 'A câmara é identificada pelo termômetro associado', 'operador', FALSE),
-('tb_leitura_temperatura', 'cod_alerta', 'INTEGER', FALSE, 'FK', 'Alerta gerado pela leitura', 'Preenchido quando a leitura está fora da faixa da câmara', 'operador', FALSE),
-('tb_leitura_temperatura', 'temperatura', 'DECIMAL(5,2)', TRUE, NULL, 'Temperatura medida', 'Comparada com a faixa da câmara e com a temperatura ideal da categoria', 'operador', FALSE),
-('tb_leitura_temperatura', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento da medição', 'Preservado no histórico do PostgreSQL após a fila Redis', 'operador', FALSE),
-('tb_leitura_temperatura', 'id_evento_redis', 'VARCHAR(100)', FALSE, 'NK', 'Identificador da leitura no Redis', 'Evita duplicidade quando o consumidor reprocessa uma mensagem', 'admin', FALSE),
+('tb_leitura_temperatura', 'cod_termometro', 'INTEGER', TRUE, 'FK', 'Termômetro de origem da leitura', 'A câmara é identificada pelo termômetro associado', 'OPERADOR', FALSE),
+('tb_leitura_temperatura', 'cod_alerta', 'INTEGER', FALSE, 'FK', 'Alerta gerado pela leitura', 'Preenchido quando a leitura está fora da faixa da câmara', 'OPERADOR', FALSE),
+('tb_leitura_temperatura', 'temperatura', 'DECIMAL(5,2)', TRUE, NULL, 'Temperatura medida', 'Comparada com a faixa da câmara; os lotes armazenados nela possuem categorias compatíveis com essa faixa', 'OPERADOR', FALSE),
+('tb_leitura_temperatura', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento da medição', 'Preservado no histórico do PostgreSQL após a fila Redis', 'OPERADOR', FALSE),
+('tb_leitura_temperatura', 'id_evento_redis', 'VARCHAR(100)', FALSE, 'NK', 'Identificador da leitura no Redis', 'Evita duplicidade quando o consumidor reprocessa uma mensagem', 'ADMIN', FALSE),
 
 -- ==============================================
 -- tb_atendimento
 -- ==============================================
-('tb_atendimento', 'cod_usuario', 'INTEGER', FALSE, 'FK', 'Funcionário responsável pelo atendimento', 'Aceita NULL: atendimento nasce pendente (via trigger), sem usuário atribuído até alguém reconhecer o alerta', 'operador', FALSE),
-('tb_atendimento', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do atendimento', 'pendente -> em_andamento -> resolvido; transições controladas por sp_reconhecer_alerta e trigger de justificativa', 'operador', FALSE),
-('tb_atendimento', 'data_hora_reconhecimento', 'TIMESTAMP', FALSE, NULL, 'Momento em que alguém assumiu o alerta', 'Diferente de data_hora_resolucao: reconhecimento é "estou ciente", resolução é "problema resolvido de fato"', 'operador', FALSE),
-('tb_atendimento', 'data_hora_resolucao', 'TIMESTAMP', FALSE, NULL, 'Momento em que o atendimento foi finalizado', 'Métrica de HACCP: mede quanto tempo o lote ficou de fato em risco, não só sem monitoramento', 'operador', FALSE),
+('tb_atendimento', 'cod_usuario', 'INTEGER', FALSE, 'FK', 'Funcionário responsável pelo atendimento', 'Aceita NULL: atendimento nasce PENDENTE (via trigger), sem usuário atribuído até alguém reconhecer o alerta', 'OPERADOR', FALSE),
+('tb_atendimento', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do atendimento', 'PENDENTE -> EM_ANDAMENTO -> RESOLVIDO; transições controladas por sp_reconhecer_alerta e trigger de justificativa', 'OPERADOR', FALSE),
+('tb_atendimento', 'data_hora_reconhecimento', 'TIMESTAMP', FALSE, NULL, 'Momento em que alguém assumiu o alerta', 'Diferente de data_hora_resolucao: reconhecimento é "estou ciente", resolução é "problema resolvido de fato"', 'OPERADOR', FALSE),
+('tb_atendimento', 'data_hora_resolucao', 'TIMESTAMP', FALSE, NULL, 'Momento em que o atendimento foi finalizado', 'Métrica de HACCP: mede quanto tempo o lote ficou de fato em risco, não só sem monitoramento', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_justificativa
 -- ==============================================
-('tb_justificativa', 'cod_atendimento', 'INTEGER', TRUE, 'FK', 'Atendimento ao qual a justificativa se refere', 'Ao ser inserida, dispara trigger que valida a temperatura e resolve o atendimento somente se ele estiver em andamento e a câmara estiver normalizada', 'operador', FALSE),
+('tb_justificativa', 'cod_atendimento', 'INTEGER', TRUE, 'FK', 'Atendimento ao qual a justificativa se refere', 'Ao ser inserida, dispara trigger que valida a temperatura e resolve o atendimento somente se ele estiver em andamento e a câmara estiver normalizada', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_relatorio
 -- ==============================================
-('tb_relatorio', 'hash_conteudo', 'VARCHAR(64)', TRUE, NULL, 'Hash SHA-256 do conteúdo do relatório', 'Garante integridade: qualquer alteração no conteúdo altera o hash, evidenciando adulteração', 'admin', TRUE),
-('tb_relatorio', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do relatório', 'gerado -> assinado -> arquivado', 'gestor', FALSE),
-('tb_relatorio', 'periodo_inicio', 'DATE', TRUE, NULL, 'Início do intervalo coberto pelo relatório', 'Sem DEFAULT de propósito: força quem gera o relatório a informar o período explicitamente', 'gestor', FALSE),
-('tb_relatorio', 'periodo_fim', 'DATE', TRUE, NULL, 'Fim do intervalo coberto pelo relatório', 'Sem DEFAULT de propósito: evita relatório de período incorreto por esquecimento', 'gestor', FALSE),
+('tb_relatorio', 'hash_conteudo', 'VARCHAR(64)', TRUE, NULL, 'Hash SHA-256 do conteúdo do relatório', 'Garante integridade: qualquer alteração no conteúdo altera o hash, evidenciando adulteração', 'ADMIN', TRUE),
+('tb_relatorio', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do relatório', 'GERADO -> ASSINADO -> ARQUIVADO', 'GESTOR', FALSE),
+('tb_relatorio', 'periodo_inicio', 'DATE', TRUE, NULL, 'Início do intervalo coberto pelo relatório', 'Sem DEFAULT de propósito: força quem gera o relatório a informar o período explicitamente', 'GESTOR', FALSE),
+('tb_relatorio', 'periodo_fim', 'DATE', TRUE, NULL, 'Fim do intervalo coberto pelo relatório', 'Sem DEFAULT de propósito: evita relatório de período incorreto por esquecimento', 'GESTOR', FALSE),
 
 -- ==============================================
 -- tb_assinatura
 -- ==============================================
-('tb_assinatura', 'numero_serie', 'VARCHAR(64)', TRUE, NULL, 'Número de série do certificado ICP-Brasil', 'Identifica unicamente o certificado usado para dar validade jurídica ao relatório', 'admin', TRUE),
-('tb_assinatura', 'carimbo_tempo', 'TEXT', TRUE, NULL, 'Token de carimbo de tempo (RFC 3161)', 'Emitido por Autoridade de Carimbo do Tempo externa; garante quando a assinatura ocorreu, de forma não manipulável', 'admin', TRUE),
+('tb_assinatura', 'numero_serie', 'VARCHAR(64)', TRUE, NULL, 'Número de série do certificado ICP-Brasil', 'Identifica unicamente o certificado usado para dar validade jurídica ao relatório', 'ADMIN', TRUE),
+('tb_assinatura', 'carimbo_tempo', 'TEXT', TRUE, NULL, 'Token de carimbo de tempo (RFC 3161)', 'Emitido por Autoridade de Carimbo do Tempo externa; garante quando a assinatura ocorreu, de forma não manipulável', 'ADMIN', TRUE),
 
 -- ==============================================
 -- tb_log_auditoria
 -- ==============================================
-('tb_log_auditoria', 'usuario_bd', 'VARCHAR(100)', TRUE, NULL, 'Login de conexão do Postgres (CURRENT_USER) que executou a ação', 'Diferente de cod_usuario: detecta alterações feitas fora da aplicação', 'admin', FALSE),
-('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Estado da linha antes da alteração (OLD)', 'Preenchido apenas em UPDATE/DELETE; pode conter dados sensíveis das tabelas auditadas', 'admin', TRUE),
-('tb_log_auditoria', 'dados_novos', 'JSONB', FALSE, NULL, 'Estado da linha depois da alteração (NEW)', 'Preenchido apenas em INSERT/UPDATE; pode conter dados sensíveis das tabelas auditadas', 'admin', TRUE),
+('tb_log_auditoria', 'usuario_bd', 'VARCHAR(100)', TRUE, NULL, 'Login de conexão do Postgres (CURRENT_USER) que executou a ação', 'Diferente de cod_usuario: detecta alterações feitas fora da aplicação', 'ADMIN', FALSE),
+('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Estado da linha antes da alteração (OLD)', 'Preenchido apenas em UPDATE/DELETE; pode conter dados sensíveis das tabelas auditadas', 'ADMIN', TRUE),
+('tb_log_auditoria', 'dados_novos', 'JSONB', FALSE, NULL, 'Estado da linha depois da alteração (NEW)', 'Preenchido apenas em INSERT/UPDATE; pode conter dados sensíveis das tabelas auditadas', 'ADMIN', TRUE),
 
 -- ==============================================
 -- tb_log_escalonamento
 -- ==============================================
-('tb_log_escalonamento', 'nivel_anterior', 'VARCHAR(8)', FALSE, NULL, 'Cargo que tinha o alerta antes da escalada', 'NULL na primeira escalada (alerta nasce sem "nível anterior")', 'operador', FALSE),
+('tb_log_escalonamento', 'nivel_anterior', 'VARCHAR(8)', FALSE, NULL, 'Cargo que tinha o alerta antes da escalada', 'NULL na primeira escalada (alerta nasce sem "nível anterior")', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_log_acesso
 -- ==============================================
-('tb_log_acesso', 'ip_origem', 'INET', TRUE, NULL, 'Endereço IP de onde partiu a tentativa de acesso', 'Considerado dado pessoal pela LGPD (permite identificação indireta do usuário)', 'admin', TRUE);
+('tb_log_acesso', 'ip_origem', 'INET', TRUE, NULL, 'Endereço IP de onde partiu a tentativa de acesso', 'Considerado dado pessoal pela LGPD (permite identificação indireta do usuário)', 'ADMIN', TRUE);
 
 
 -- ====================================================================
 -- DEPLOY: dau.sql
 -- ====================================================================
+
 -- ====================================================================
 -- MONITORAMENTO DAU (DAILY ACTIVE USERS)
 -- ====================================================================
@@ -1314,9 +1322,11 @@ WHERE tentativa_sucesso = TRUE
 GROUP BY data_hora::DATE
 ORDER BY data_acesso;
 
+
 -- ====================================================================
 -- DEPLOY: etl-transformacoes.sql
 -- ====================================================================
+
 -- ====================================================================
 -- TRANSFORMAÇÕES ETL: CTEs, WINDOW FUNCTIONS E CTE RECURSIVA
 -- ====================================================================
@@ -1336,8 +1346,8 @@ WITH leituras_classificadas AS (
 		lt.cod_alerta,
 		CASE
 			WHEN lt.temperatura BETWEEN cam.temperatura_min AND cam.temperatura_max
-				THEN 'normal'
-			ELSE 'fora_da_faixa'
+				THEN 'NORMAL'
+			ELSE 'FORA_DA_FAIXA'
 		END AS classificacao
 	FROM tb_leitura_temperatura lt
 	JOIN tb_camara_frigorifica cam
@@ -1381,7 +1391,7 @@ WITH lotes_ativos AS (
 	JOIN tb_lote_camara_frigorifica lc
 	  ON lc.cod_lote = l.id
 	 AND lc.data_saida IS NULL
-	WHERE l.status = 'ativo'
+	WHERE l.status = 'ATIVO'
 )
 SELECT
 	lotes_ativos.*,
@@ -1398,7 +1408,7 @@ WITH RECURSIVE etapas_escalonamento AS (
 	SELECT
 		a.id AS cod_alerta,
 		a.data_hora AS inicio_alerta,
-		'operador'::VARCHAR(8) AS nivel,
+		'OPERADOR'::VARCHAR(8) AS nivel,
 		1 AS ordem_etapa,
 		0 AS percentual_vida_util,
 		a.nivel_atual
@@ -1410,18 +1420,18 @@ WITH RECURSIVE etapas_escalonamento AS (
 		etapas.cod_alerta,
 		etapas.inicio_alerta,
 		CASE etapas.nivel
-			WHEN 'operador' THEN 'gestor'
-			WHEN 'gestor' THEN 'admin'
+			WHEN 'OPERADOR' THEN 'GESTOR'
+			WHEN 'GESTOR' THEN 'ADMIN'
 		END::VARCHAR(8) AS nivel,
 		etapas.ordem_etapa + 1,
 		CASE etapas.nivel
-			WHEN 'operador' THEN 40
-			WHEN 'gestor' THEN 70
+			WHEN 'OPERADOR' THEN 40
+			WHEN 'GESTOR' THEN 70
 		END AS percentual_vida_util,
 		etapas.nivel_atual
 	FROM etapas_escalonamento etapas
 	WHERE etapas.nivel != etapas.nivel_atual
-	  AND etapas.nivel IN ('operador', 'gestor')
+	  AND etapas.nivel IN ('OPERADOR', 'GESTOR')
 )
 SELECT
 	cod_alerta,
@@ -1432,9 +1442,11 @@ SELECT
 FROM etapas_escalonamento
 ORDER BY cod_alerta, ordem_etapa;
 
+
 -- ====================================================================
 -- DEPLOY: indices.sql
 -- ====================================================================
+
 -- ====================================================================
 -- ÍNDICES E CONSULTAS DE ANÁLISE DE DESEMPENHO
 -- ====================================================================
@@ -1467,8 +1479,8 @@ LIMIT 1;
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT a.id, a.nivel_atual, a.data_hora
 FROM tb_alerta a
-WHERE a.status = 'ativo'
-	AND a.nivel_atual IN ('operador', 'gestor')
+WHERE a.status = 'ATIVO'
+	AND a.nivel_atual IN ('OPERADOR', 'GESTOR')
 ORDER BY a.data_hora;
 
 -- Consulta 3: lotes atualmente ativos em uma câmara frigorífica
@@ -1519,8 +1531,8 @@ LIMIT 1;
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT a.id, a.nivel_atual, a.data_hora
 FROM tb_alerta a
-WHERE a.status = 'ativo'
-	AND a.nivel_atual IN ('operador', 'gestor')
+WHERE a.status = 'ATIVO'
+	AND a.nivel_atual IN ('OPERADOR', 'GESTOR')
 ORDER BY a.data_hora;
 
 -- Consulta 3: lotes atualmente ativos em uma câmara frigorífica
@@ -1534,6 +1546,7 @@ WHERE lc.cod_camara_frigorifica = 1
 -- ====================================================================
 -- DEPLOY: roles.sql
 -- ====================================================================
+
 -- ====================================================================
 -- ROLES E USUÁRIOS DO POSTGRESQL
 -- ====================================================================
@@ -1627,6 +1640,7 @@ REVOKE EXECUTE ON PROCEDURE sp_cadastrar_usuario(VARCHAR, VARCHAR, VARCHAR, VARC
 -- ====================================================================
 -- DEPLOY: dataload.sql
 -- ====================================================================
+
 -- ====================================================================
 -- MASSA DE DADOS PARA TESTE DE VOLUME
 -- A carga possui mais de 500 registros distribuídos entre as tabelas.
@@ -1718,9 +1732,9 @@ SELECT
     'colaborador' || LPAD(gs::TEXT, 3, '0') || '@skadi.com.br',
     '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
     CASE
-        WHEN gs <= 10 THEN 'admin'
-        WHEN gs <= 30 THEN 'gestor'
-        ELSE 'operador'
+        WHEN gs <= 10 THEN 'ADMIN'
+        WHEN gs <= 30 THEN 'GESTOR'
+        ELSE 'OPERADOR'
     END,
     ((gs - 1) % 5) + 1,
     CASE
@@ -1746,7 +1760,7 @@ VALUES (
     NULL,
     'marianaproque400@gmail.com',
     '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
-    'super_admin',
+    'SUPER_ADMIN',
     NULL,
     NULL
 );
@@ -2042,9 +2056,9 @@ INSERT INTO tb_relatorio (
     cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status
 )
 VALUES
-(2, 'a1b2c3d4e5f67890123456789012345678901234567890123456789012345678', '2026-08-01', '2026-08-31', 'gerado'),
-(3, 'b2c3d4e5f678901234567890123456789012345678901234567890123456789', '2026-08-01', '2026-08-31', 'assinado'),
-(4, 'c3d4e5f6789012345678901234567890123456789012345678901234567890', '2026-07-01', '2026-07-31', 'arquivado');
+(2, 'a1b2c3d4e5f67890123456789012345678901234567890123456789012345678', '2026-08-01', '2026-08-31', 'GERADO'),
+(3, 'b2c3d4e5f678901234567890123456789012345678901234567890123456789', '2026-08-01', '2026-08-31', 'ASSINADO'),
+(4, 'c3d4e5f6789012345678901234567890123456789012345678901234567890', '2026-07-01', '2026-07-31', 'ARQUIVADO');
 
 
 -- =============================================
@@ -2067,19 +2081,19 @@ INSERT INTO tb_log_acesso_relatorio (
     cod_relatorio, cod_usuario, acao
 )
 VALUES
-    (1, 32, 'visualizou'),
-    (1, 33, 'baixou'),
-    (2, 33, 'visualizou'),
-    (3, 52, 'baixou');
+    (1, 32, 'VISUALIZOU'),
+    (1, 33, 'BAIXOU'),
+    (2, 33, 'VISUALIZOU'),
+    (3, 52, 'BAIXOU');
 
 
 -- Simulando escalonamento para gerar um log em tb_log_escalonamento
 UPDATE tb_alerta
-SET nivel_atual = 'gestor'
+SET nivel_atual = 'GESTOR'
 WHERE id = (
     SELECT id
     FROM tb_alerta
-    WHERE nivel_gravidade = 'urgente'
+    WHERE nivel_gravidade = 'URGENTE'
     ORDER BY id DESC
     LIMIT 1
 );
@@ -2092,10 +2106,10 @@ INSERT INTO tb_log_sensor (
     cod_termometro, tipo_evento, detalhes
 )
 VALUES
-(1, 'manutencao', 'Sensor calibrado'),
-(2, 'falha', 'Leitura fora do comportamento esperado'),
-(7, 'manutencao', 'Sensor verificado'),
-(10, 'bateria', 'Bateria do sensor substituída');
+(1, 'MANUTENCAO', 'Sensor calibrado'),
+(2, 'FALHA', 'Leitura fora do comportamento esperado'),
+(7, 'MANUTENCAO', 'Sensor verificado'),
+(10, 'BATERIA', 'Bateria do sensor substituída');
 
 
 -- =============================================

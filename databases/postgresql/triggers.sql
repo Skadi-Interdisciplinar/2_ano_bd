@@ -10,7 +10,7 @@ CREATE OR REPLACE FUNCTION fn_validar_gestor_usuario()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Super ADM administra a plataforma e não possui CPF, CD ou gestor.
-    IF NEW.nivel_acesso = 'super_admin' THEN
+    IF NEW.nivel_acesso = 'SUPER_ADMIN' THEN
         IF NEW.cpf IS NOT NULL THEN
             RAISE EXCEPTION
                 'Usuário super_admin não pode possuir CPF.';
@@ -43,7 +43,7 @@ BEGIN
     END IF;
 
     -- ADM e Gestor não possuem gestor responsável.
-    IF NEW.nivel_acesso IN ('admin', 'gestor')
+    IF NEW.nivel_acesso IN ('ADMIN', 'GESTOR')
        AND NEW.cod_gestor IS NOT NULL THEN
         RAISE EXCEPTION
             'Usuário com nível % não pode possuir gestor responsável.',
@@ -51,19 +51,19 @@ BEGIN
     END IF;
 
     -- Operador deve possuir gestor responsável.
-    IF NEW.nivel_acesso = 'operador'
+    IF NEW.nivel_acesso = 'OPERADOR'
        AND NEW.cod_gestor IS NULL THEN
         RAISE EXCEPTION
             'Usuário operador deve possuir gestor responsável.';
     END IF;
 
     -- O gestor do operador deve ser gestor e pertencer ao mesmo CD.
-    IF NEW.nivel_acesso = 'operador'
+    IF NEW.nivel_acesso = 'OPERADOR'
        AND NOT EXISTS (
             SELECT 1
             FROM tb_usuario gestor
             WHERE gestor.id = NEW.cod_gestor
-              AND gestor.nivel_acesso = 'gestor'
+              AND gestor.nivel_acesso = 'GESTOR'
               AND gestor.cod_cd = NEW.cod_cd
        ) THEN
         RAISE EXCEPTION
@@ -74,8 +74,8 @@ BEGIN
 
     -- Um gestor não pode deixar de ser gestor enquanto possuir operadores vinculados.
     IF TG_OP = 'UPDATE'
-       AND OLD.nivel_acesso = 'gestor'
-       AND NEW.nivel_acesso <> 'gestor'
+       AND OLD.nivel_acesso = 'GESTOR'
+       AND NEW.nivel_acesso <> 'GESTOR'
        AND EXISTS (
             SELECT 1
             FROM tb_usuario subordinado
@@ -105,25 +105,25 @@ BEGIN
             SELECT 1
             FROM tb_usuario usuario_responsavel
             WHERE usuario_responsavel.id = NEW.cod_usuario_responsavel
-              AND usuario_responsavel.nivel_acesso = 'super_admin'
+              AND usuario_responsavel.nivel_acesso = 'SUPER_ADMIN'
        ) THEN
         RAISE EXCEPTION
             'O responsável da solicitação de suporte deve possuir nível super_admin.';
     END IF;
 
-    IF TG_OP = 'INSERT' AND NEW.status <> 'registrado' THEN
+    IF TG_OP = 'INSERT' AND NEW.status <> 'REGISTRADO' THEN
         RAISE EXCEPTION
             'Uma solicitação de suporte deve ser criada com status registrado.';
     END IF;
 
-    IF NEW.status = 'registrado' THEN
+    IF NEW.status = 'REGISTRADO' THEN
         IF NEW.cod_usuario_responsavel IS NOT NULL
            OR NEW.resposta IS NOT NULL
            OR NEW.data_hora_encerramento IS NOT NULL THEN
             RAISE EXCEPTION
                 'Uma solicitação registrada não pode possuir responsável, resposta ou data de encerramento.';
         END IF;
-    ELSIF NEW.status = 'em_atendimento' THEN
+    ELSIF NEW.status = 'EM_ATENDIMENTO' THEN
         IF NEW.cod_usuario_responsavel IS NULL THEN
             RAISE EXCEPTION
                 'Uma solicitação em atendimento deve possuir um responsável super_admin.';
@@ -133,7 +133,7 @@ BEGIN
             RAISE EXCEPTION
                 'Uma solicitação em atendimento não pode possuir data de encerramento.';
         END IF;
-    ELSIF NEW.status = 'atendido' THEN
+    ELSIF NEW.status = 'ATENDIDO' THEN
         IF NEW.cod_usuario_responsavel IS NULL
            OR NEW.resposta IS NULL
            OR NEW.data_hora_encerramento IS NULL THEN
@@ -143,19 +143,19 @@ BEGIN
     END IF;
 
     IF TG_OP = 'UPDATE' THEN
-        IF OLD.status = 'registrado'
-           AND NEW.status NOT IN ('registrado', 'em_atendimento') THEN
+        IF OLD.status = 'REGISTRADO'
+           AND NEW.status NOT IN ('REGISTRADO', 'EM_ATENDIMENTO') THEN
             RAISE EXCEPTION
                 'A solicitação deve passar de registrado para em_atendimento antes de ser atendida.';
         END IF;
 
-        IF OLD.status = 'em_atendimento'
-           AND NEW.status NOT IN ('em_atendimento', 'atendido') THEN
+        IF OLD.status = 'EM_ATENDIMENTO'
+           AND NEW.status NOT IN ('EM_ATENDIMENTO', 'ATENDIDO') THEN
             RAISE EXCEPTION
                 'A solicitação em atendimento só pode permanecer nesse status ou ser atendida.';
         END IF;
 
-        IF OLD.status = 'atendido' AND NEW.status <> 'atendido' THEN
+        IF OLD.status = 'ATENDIDO' AND NEW.status <> 'ATENDIDO' THEN
             RAISE EXCEPTION
                 'Uma solicitação atendida não pode retornar a um status anterior.';
         END IF;
@@ -176,7 +176,7 @@ CREATE OR REPLACE FUNCTION fn_criar_atendimento_pendente()
 RETURNS TRIGGER AS $$
 BEGIN
     INSERT INTO tb_atendimento (cod_alerta, status)
-    VALUES (NEW.id, 'pendente');
+    VALUES (NEW.id, 'PENDENTE');
 
     RETURN NEW;
 END;
@@ -216,7 +216,7 @@ BEGIN
             NEW.cod_atendimento;
     END IF;
 
-    IF v_status_atendimento <> 'em_andamento' THEN
+    IF v_status_atendimento <> 'EM_ANDAMENTO' THEN
         RAISE EXCEPTION
             'O atendimento precisa estar em andamento para ser resolvido.';
     END IF;
@@ -227,12 +227,12 @@ BEGIN
     ) THEN
 
         UPDATE tb_atendimento
-           SET status = 'resolvido',
+           SET status = 'RESOLVIDO',
                data_hora_resolucao = CURRENT_TIMESTAMP
          WHERE id = NEW.cod_atendimento;
 
         UPDATE tb_alerta
-           SET status = 'resolvido'
+           SET status = 'RESOLVIDO'
          WHERE id = v_cod_alerta;
     END IF;
 
@@ -327,10 +327,10 @@ BEGIN
         VALUES (
             v_camara,
             v_vida_util,
-            'operador',
+            'OPERADOR',
             NEW.data_hora,
             v_gravidade,
-            'ativo'
+            'ATIVO'
         )
         RETURNING id INTO v_alerta;
 
@@ -338,7 +338,7 @@ BEGIN
            SET cod_alerta = v_alerta
          WHERE id = NEW.id;
 
-        CALL sp_notificar_nivel_acesso(v_alerta, 'operador');
+        CALL sp_notificar_nivel_acesso(v_alerta, 'OPERADOR');
     END IF;
 
     RETURN NEW;
@@ -358,7 +358,7 @@ BEGIN
     v_horas_prazo := fn_calcular_prazo_escalonamento(NEW.id, 40);
 
     PERFORM pg_notify(
-        'novo_alerta',
+        'VOVO_ALERTA',
         json_build_object(
             'id_alerta', NEW.id,
             'prazo_epoch',
