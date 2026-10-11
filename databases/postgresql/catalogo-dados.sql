@@ -100,6 +100,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_notificacao_alerta', 'cod_alerta', 'INTEGER', TRUE, 'FK', 'Alerta notificado', 'Relaciona a notificação ao alerta correspondente', 'OPERADOR', FALSE),
 ('tb_notificacao_alerta', 'cod_usuario', 'INTEGER', TRUE, 'FK', 'Usuário notificado', 'Usuário do mesmo CD e nível de acesso do escalonamento', 'OPERADOR', FALSE),
 ('tb_notificacao_alerta', 'data_hora_envio', 'TIMESTAMP', TRUE, NULL, 'Momento do registro da notificação', 'Usado para histórico de envio das notificações push', 'OPERADOR', FALSE),
+('tb_notificacao_alerta', 'data_hora_leitura', 'TIMESTAMP', FALSE, NULL, 'Momento em que o usuário leu a notificação', 'NULL enquanto a notificação não tiver sido lida; permite medir leitura antes do reconhecimento do alerta', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_leitura_temperatura
@@ -121,12 +122,13 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 -- tb_justificativa
 -- ==============================================
-('tb_justificativa', 'cod_atendimento', 'INTEGER', TRUE, 'FK', 'Atendimento ao qual a justificativa se refere', 'Ao ser inserida, dispara trigger que valida a temperatura e resolve o atendimento somente se ele estiver em andamento e a câmara estiver normalizada', 'OPERADOR', FALSE),
+('tb_justificativa', 'cod_atendimento', 'INTEGER', TRUE, 'FK', 'Atendimento ao qual a justificativa se refere', 'Registra a justificativa do atendimento; a normalização também pode resolver alerta e atendimento automaticamente ao inserir uma leitura normal mais recente', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_relatorio
 -- ==============================================
 ('tb_relatorio', 'hash_conteudo', 'VARCHAR(64)', TRUE, NULL, 'Hash SHA-256 do conteúdo do relatório', 'Garante integridade: qualquer alteração no conteúdo altera o hash, evidenciando adulteração', 'ADMIN', TRUE),
+('tb_relatorio', 'conteudo', 'TEXT', TRUE, NULL, 'Conteúdo integral do relatório', 'Armazena o relatório cujo hash SHA-256 é mantido em hash_conteudo', 'GESTOR', TRUE),
 ('tb_relatorio', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do relatório', 'GERADO -> ASSINADO -> ARQUIVADO', 'GESTOR', FALSE),
 ('tb_relatorio', 'periodo_inicio', 'DATE', TRUE, NULL, 'Início do intervalo coberto pelo relatório', 'Sem DEFAULT de propósito: força quem gera o relatório a informar o período explicitamente', 'GESTOR', FALSE),
 ('tb_relatorio', 'periodo_fim', 'DATE', TRUE, NULL, 'Fim do intervalo coberto pelo relatório', 'Sem DEFAULT de propósito: evita relatório de período incorreto por esquecimento', 'GESTOR', FALSE),
@@ -135,6 +137,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- tb_assinatura
 -- ==============================================
 ('tb_assinatura', 'numero_serie', 'VARCHAR(64)', TRUE, NULL, 'Número de série do certificado ICP-Brasil', 'Identifica unicamente o certificado usado para dar validade jurídica ao relatório', 'ADMIN', TRUE),
+('tb_assinatura', 'certificado_publico', 'TEXT', TRUE, NULL, 'Chave pública usada para verificar a assinatura digital', 'Armazenada em Base64 (DER/X.509) para verificação criptográfica da assinatura', 'ADMIN', FALSE),
 ('tb_assinatura', 'carimbo_tempo', 'TEXT', TRUE, NULL, 'Token de carimbo de tempo (RFC 3161)', 'Emitido por Autoridade de Carimbo do Tempo externa; garante quando a assinatura ocorreu, de forma não manipulável', 'ADMIN', TRUE),
 
 -- ==============================================

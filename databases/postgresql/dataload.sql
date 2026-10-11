@@ -216,107 +216,7 @@ VALUES
 -- 9. LEITURAS DE TEMPERATURA
 -- =============================================
 
--- 9.1 Leituras normais (dentro da faixa, não geram alerta)
-INSERT INTO tb_leitura_temperatura
-    (cod_termometro, temperatura, data_hora)
-VALUES
--- Câmara frigorífica 1 - faixa: 3°C a 4,5°C
-(1, 4.00, '2026-08-30 08:00:00'),
-(1, 4.50, '2026-08-30 20:00:00'),
-(1, 3.80, '2026-08-31 08:00:00'),
-(1, 4.20, '2026-08-31 20:00:00'),
-(1, 4.10, '2026-09-01 08:00:00'),
-(1, 3.90, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 2 - faixa: 2°C a 6°C
-(2, 3.50, '2026-08-30 08:00:00'),
-(2, 4.00, '2026-08-30 20:00:00'),
-(2, 4.30, '2026-08-31 08:00:00'),
-(2, 3.70, '2026-08-31 20:00:00'),
-(2, 4.20, '2026-09-01 08:00:00'),
-(2, 3.80, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 3 - faixa: 2°C a 6°C
-(3, 4.20, '2026-08-30 08:00:00'),
-(3, 3.80, '2026-08-30 20:00:00'),
-(3, 4.50, '2026-08-31 08:00:00'),
-(3, 4.00, '2026-08-31 20:00:00'),
-(3, 3.60, '2026-09-01 08:00:00'),
-(3, 4.40, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 4 - faixa: 2°C a 6°C
-(4, 3.90, '2026-08-30 08:00:00'),
-(4, 4.10, '2026-08-30 20:00:00'),
-(4, 4.40, '2026-08-31 08:00:00'),
-(4, 3.60, '2026-08-31 20:00:00'),
-(4, 4.00, '2026-09-01 08:00:00'),
-(4, 4.30, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 5 - faixa: 2°C a 6°C
-(5, 4.00, '2026-08-30 08:00:00'),
-(5, 4.30, '2026-08-30 20:00:00'),
-(5, 3.70, '2026-08-31 08:00:00'),
-(5, 4.20, '2026-08-31 20:00:00'),
-(5, 3.90, '2026-09-01 08:00:00'),
-(5, 4.10, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 6 - faixa: 2°C a 6°C
-(6, 3.80, '2026-08-30 08:00:00'),
-(6, 4.10, '2026-08-30 20:00:00'),
-(6, 4.50, '2026-08-31 08:00:00'),
-(6, 3.90, '2026-08-31 20:00:00'),
-(6, 4.20, '2026-09-01 08:00:00'),
-(6, 3.70, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 7 - faixa: -2°C a 2°C
-(7, 0.00, '2026-08-30 08:00:00'),
-(7, -0.50, '2026-08-30 20:00:00'),
-(7, 0.50, '2026-08-31 08:00:00'),
-(7, -1.00, '2026-08-31 20:00:00'),
-(7, 0.20, '2026-09-01 08:00:00'),
-(7, -0.30, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 8 - faixa: -2°C a 2°C
-(8, 0.50, '2026-08-30 08:00:00'),
-(8, -0.20, '2026-08-30 20:00:00'),
-(8, 0.80, '2026-08-31 08:00:00'),
-(8, -0.70, '2026-08-31 20:00:00'),
-(8, 0.30, '2026-09-01 08:00:00'),
-(8, -0.40, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 9 - faixa: -2°C a 2°C
-(9, -0.50, '2026-08-30 08:00:00'),
-(9, 0.00, '2026-08-30 20:00:00'),
-(9, 0.70, '2026-08-31 08:00:00'),
-(9, -0.30, '2026-08-31 20:00:00'),
-(9, 0.40, '2026-09-01 08:00:00'),
-(9, -0.80, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 10 - faixa: -22°C a -16°C
-(10, -18.00, '2026-08-30 08:00:00'),
-(10, -19.00, '2026-08-30 20:00:00'),
-(10, -17.50, '2026-08-31 08:00:00'),
-(10, -18.50, '2026-08-31 20:00:00'),
-(10, -20.00, '2026-09-01 08:00:00'),
-(10, -17.00, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 11 - faixa: -22°C a -16°C
-(11, -18.50, '2026-08-30 08:00:00'),
-(11, -19.50, '2026-08-30 20:00:00'),
-(11, -17.00, '2026-08-31 08:00:00'),
-(11, -18.00, '2026-08-31 20:00:00'),
-(11, -20.50, '2026-09-01 08:00:00'),
-(11, -17.50, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 12 - faixa: -22°C a -16°C
-(12, -19.00, '2026-08-30 08:00:00'),
-(12, -18.00, '2026-08-30 20:00:00'),
-(12, -17.50, '2026-08-31 08:00:00'),
-(12, -20.00, '2026-08-31 20:00:00'),
-(12, -18.50, '2026-09-01 08:00:00'),
-(12, -17.00, '2026-09-01 20:00:00');
-
--- 9.2 Leituras fora da faixa (geram alerta via trigger, um exemplo por gravidade)
+-- Leituras fora da faixa: cada uma gera um alerta via trigger.
 INSERT INTO tb_leitura_temperatura
     (cod_termometro, temperatura, data_hora)
 VALUES
@@ -332,37 +232,11 @@ VALUES
 -- Câmara frigorífica 10 | Limite máximo: -16°C | Diferença: 8°C | Gravidade Crítica
 (10, -8.00, '2026-09-02 09:30:00');
 
--- 9.3 Histórico adicional (mais dias de leituras normais, dentro da faixa de cada câmara frigorífica)
-INSERT INTO tb_leitura_temperatura (cod_termometro, temperatura, data_hora)
-SELECT
-    r.cod_termometro,
-    round(
-        (
-            r.temperatura_min
-            + (r.temperatura_max - r.temperatura_min)
-            * (0.3 + 0.4 * random())
-        )::numeric,
-        2
-    ),
-    TIMESTAMP '2026-08-20 08:00:00'
-        + ((gs / 3) || ' days')::interval
-        + (((gs % 3) * 8) || ' hours')::interval
-FROM tb_camara_frigorifica r,
-     generate_series(0, 29) AS gs;
-
-
 -- =============================================
--- 10. FLUXO DE ATENDIMENTO (exemplo sobre os alertas gerados na seção 9.2)
+-- 10. RECONHECIMENTO DE ALERTA (exemplo)
 -- =============================================
-
--- Leitura normal após o alerta da câmara frigorífica 1.
--- Permite que a justificativa seguinte encerre o atendimento e o alerta.
-INSERT INTO tb_leitura_temperatura
-    (cod_termometro, temperatura, data_hora)
-VALUES
-(1, 4.20, '2026-09-02 09:00:00');
-
--- Reconhece e resolve o alerta de gravidade "baixa" (câmara frigorífica 1)
+-- Reconhece o alerta da câmara frigorífica 1; a resolução automática
+-- ocorre quando uma leitura posterior registrar temperatura dentro da faixa.
 DO $$
 DECLARE
     v_cod_alerta INTEGER;
@@ -376,19 +250,6 @@ BEGIN
 
     CALL sp_reconhecer_alerta(v_cod_alerta, 61);
 END $$;
-
-INSERT INTO tb_justificativa (
-    cod_atendimento, motivo, descricao
-)
-VALUES (
-    (SELECT a.id
-     FROM tb_atendimento a
-     JOIN tb_alerta al ON al.id = a.cod_alerta
-     WHERE al.cod_camara_frigorifica = 1
-     ORDER BY a.id DESC LIMIT 1),
-    'Porta aberta para reposição',
-    'Alerta gerado durante reposição manual de estoque; temperatura normalizada após fechamento da câmara.'
-);
 
 -- Reconhece o alerta crítico do câmara frigorífica 10, sem resolver
 DO $$
@@ -410,25 +271,26 @@ END $$;
 -- 11. RELATÓRIOS
 -- =============================================
 INSERT INTO tb_relatorio (
-    cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status
+    cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status, conteudo
 )
 VALUES
-(2, 'a1b2c3d4e5f67890123456789012345678901234567890123456789012345678', '2026-08-01', '2026-08-31', 'GERADO'),
-(3, 'b2c3d4e5f678901234567890123456789012345678901234567890123456789', '2026-08-01', '2026-08-31', 'ASSINADO'),
-(4, 'c3d4e5f6789012345678901234567890123456789012345678901234567890', '2026-07-01', '2026-07-31', 'ARQUIVADO');
+(2, 'e59d3e70d8e55ce6fc36361645a3708294c6c4e5971a1ea0cf7844a4c7d6d862', '2026-08-01', '2026-08-31', 'GERADO', 'Relatorio operacional do periodo de agosto de 2026 - usuario 2.'),
+(3, '998be91f97fd94a6e41e184ece055dd2a3d30fa1a36beda81784fde6ce0d259c', '2026-08-01', '2026-08-31', 'ASSINADO', 'Relatorio operacional do periodo de agosto de 2026 - usuario 3.'),
+(4, '13c895e9b2a36953fe26ce97179eb2297eecfffa5a5205d0f2912cd6d41c0a9a', '2026-07-01', '2026-07-31', 'ARQUIVADO', 'Relatorio operacional do periodo de julho de 2026 - usuario 4.');
 
 
 -- =============================================
 -- 12. ASSINATURAS
 -- =============================================
+-- Chaves e assinaturas são placeholders de carga; não servem para validação criptográfica.
 INSERT INTO tb_assinatura (
     cod_relatorio, certificado_titular, numero_serie,
-    autoridade_certificadora, algoritmo_assinatura,
+    autoridade_certificadora, algoritmo_assinatura, certificado_publico,
     assinatura, carimbo_tempo
 )
 VALUES
-(2, 'Sistema ColdChain', 'CERT-2026-0001', 'ICP-Brasil', 'SHA256withRSA', 'assinatura_simulada_relatorio_2', '2026-09-02 10:00:00'),
-(3, 'Sistema ColdChain', 'CERT-2026-0002', 'ICP-Brasil', 'SHA256withRSA', 'assinatura_simulada_relatorio_3', '2026-09-02 10:05:00');
+(2, 'Sistema ColdChain', 'CERT-2026-0001', 'ICP-Brasil', 'SHA256withRSA', 'CHAVE_PUBLICA_DE_TESTE_NAO_UTILIZAR', 'assinatura_simulada_relatorio_2', '2026-09-02 10:00:00'),
+(3, 'Sistema ColdChain', 'CERT-2026-0002', 'ICP-Brasil', 'SHA256withRSA', 'CHAVE_PUBLICA_DE_TESTE_NAO_UTILIZAR', 'assinatura_simulada_relatorio_3', '2026-09-02 10:05:00');
 
 
 -- =============================================

@@ -200,6 +200,7 @@ CREATE TABLE tb_notificacao_alerta (
 	cod_alerta INTEGER NOT NULL,
 	cod_usuario INTEGER NOT NULL,
 	data_hora_envio TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	data_hora_leitura TIMESTAMP,
 
 	CONSTRAINT pk_notificacao_alerta PRIMARY KEY (id),
 	CONSTRAINT fk_notificacao_alerta FOREIGN KEY (cod_alerta) REFERENCES tb_alerta(id),
@@ -250,12 +251,14 @@ CREATE TABLE tb_relatorio (
 	cod_usuario_gerador INTEGER NOT NULL,
 	data_hora_geracao TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	hash_conteudo VARCHAR(64) NOT NULL,
+	conteudo TEXT NOT NULL,
 	periodo_inicio DATE NOT NULL,
 	periodo_fim DATE NOT NULL,
 	status VARCHAR(50) NOT NULL,
 
 	CONSTRAINT pk_relatorio PRIMARY KEY (id),
 	CONSTRAINT fk_relatorio_usuario FOREIGN KEY (cod_usuario_gerador) REFERENCES tb_usuario(id),
+	CONSTRAINT ck_relatorio_periodo CHECK (periodo_fim >= periodo_inicio),
 	CONSTRAINT ck_relatorio_status CHECK (status IN ('GERADO', 'ASSINADO', 'ARQUIVADO'))
 );
 
@@ -266,6 +269,7 @@ CREATE TABLE tb_assinatura (
 	numero_serie VARCHAR(64) NOT NULL,
 	autoridade_certificadora VARCHAR(255) NOT NULL,
 	algoritmo_assinatura VARCHAR(50) NOT NULL,
+	certificado_publico TEXT NOT NULL,
 	assinatura TEXT NOT NULL,
 	data_assinatura DATE NOT NULL DEFAULT CURRENT_DATE,
 	carimbo_tempo TEXT NOT NULL,

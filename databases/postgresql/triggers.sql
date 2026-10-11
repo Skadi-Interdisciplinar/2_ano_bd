@@ -2,6 +2,7 @@ DROP TRIGGER IF EXISTS trg_criar_atendimento_pendente ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_resolver_atendimento_por_justificativa ON tb_justificativa;
 DROP TRIGGER IF EXISTS trg_validar_temperatura_categoria_camara ON tb_lote_camara_frigorifica;
 DROP TRIGGER IF EXISTS trg_gerar_alerta_por_leitura ON tb_leitura_temperatura;
+DROP TRIGGER IF EXISTS trg_resolver_alerta_por_leitura_normal ON tb_leitura_temperatura;
 DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_validar_gestor_usuario ON tb_usuario;
 DROP TRIGGER IF EXISTS trg_validar_solicitacao_suporte ON tb_solicitacao_suporte;
@@ -348,6 +349,56 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_gerar_alerta_por_leitura
 AFTER INSERT ON tb_leitura_temperatura
 FOR EACH ROW EXECUTE FUNCTION fn_gerar_alerta_por_leitura();
+
+
+CREATE OR REPLACE FUNCTION fn_resolver_alerta_por_leitura_normal()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_camara INTEGER;
+    v_temperatura_min DECIMAL(5,2);
+    v_temperatura_max DECIMAL(5,2);
+BEGIN
+    SELECT cam.id, cam.temperatura_min, cam.temperatura_max
+      INTO v_camara, v_temperatura_min, v_temperatura_max
+      FROM tb_camara_frigorifica cam
+     WHERE cam.cod_termometro = NEW.cod_termometro;
+
+    IF v_camara IS NULL
+       OR NEW.temperatura < v_temperatura_min
+       OR NEW.temperatura > v_temperatura_max THEN
+        RETURN NEW;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+          FROM tb_leitura_temperatura posterior
+         WHERE posterior.cod_termometro = NEW.cod_termometro
+           AND (posterior.data_hora, posterior.id) > (NEW.data_hora, NEW.id)
+    ) THEN
+        RETURN NEW;
+    END IF;
+
+    UPDATE tb_atendimento atd
+       SET status = 'RESOLVIDO',
+           data_hora_resolucao = CURRENT_TIMESTAMP
+      FROM tb_alerta a
+     WHERE a.id = atd.cod_alerta
+       AND a.cod_camara_frigorifica = v_camara
+       AND a.status = 'ATIVO'
+       AND atd.status = 'PENDENTE';
+
+    UPDATE tb_alerta
+       SET status = 'RESOLVIDO'
+     WHERE cod_camara_frigorifica = v_camara
+       AND status = 'ATIVO';
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_resolver_alerta_por_leitura_normal
+AFTER INSERT ON tb_leitura_temperatura
+FOR EACH ROW EXECUTE FUNCTION fn_resolver_alerta_por_leitura_normal();
 
 
 CREATE OR REPLACE FUNCTION fn_impedir_alerta_aberto_camara()
