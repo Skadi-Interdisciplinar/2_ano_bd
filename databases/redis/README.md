@@ -37,10 +37,9 @@ constraint `uq_leitura_evento_redis` impede uma segunda inserção.
 
 ## Execução
 
-1. Copie `.env.example` para `.env` e informe a URL real do PostgreSQL e do
-   Redis.
+1. Na raiz do repositório, copie `.env.example` para `.env` e preencha as variáveis `POSTGRES_*` e `REDIS_*`.
 2. Instale as dependências de `requirements.txt`.
-3. Execute `python worker.py`.
+3. Execute `python databases/redis/worker.py` a partir da raiz do repositório.
 
 O usuário PostgreSQL do worker deve ter as permissões definidas em
 `databases/postgresql/roles.sql`.

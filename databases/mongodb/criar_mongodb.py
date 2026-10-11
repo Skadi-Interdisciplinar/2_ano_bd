@@ -4,9 +4,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pymongo import ASCENDING, DESCENDING, MongoClient
 
-# Carrega o .env localizado ao lado deste script, independentemente da pasta
-# pela qual o comando for executado.
-load_dotenv(Path(__file__).resolve().parent / ".env")
+# Carrega o .env da raiz do repositório.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 MONGO_URI = os.getenv("MONGODB_URI")
 DATABASE_NAME = "Skadi"
