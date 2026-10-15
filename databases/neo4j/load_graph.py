@@ -71,7 +71,8 @@ def sync() -> None:
             "categorias": fetch_rows(
                 postgres,
                 """
-                SELECT id, nome, temperatura_ideal, vida_util_horas
+                SELECT id, nome, temperatura_ideal,
+                       EXTRACT(EPOCH FROM vida_util_horas) / 3600.0 AS vida_util_horas
                 FROM tb_categoria
                 """,
             ),
@@ -102,7 +103,9 @@ def sync() -> None:
                 postgres,
                 """
                 SELECT id, cod_camara_frigorifica,
-                       vida_util_referencia_horas, nivel_atual,
+                       EXTRACT(EPOCH FROM vida_util_referencia_horas) / 3600.0
+                           AS vida_util_referencia_horas,
+                       nivel_atual,
                        data_hora, tipo, nivel_gravidade, status
                 FROM tb_alerta
                 """,

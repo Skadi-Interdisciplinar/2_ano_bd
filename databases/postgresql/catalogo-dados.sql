@@ -60,7 +60,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_categoria', 'nome', 'VARCHAR(150)', TRUE, 'NK', 'Categoria de armazenamento', 'Única no sistema; concentra os parâmetros comuns aos lotes', 'OPERADOR', FALSE),
 ('tb_categoria', 'temperatura_min', 'DECIMAL(5,2)', TRUE, NULL, 'Limite mínimo de temperatura da categoria', 'Deve ser maior ou igual ao limite mínimo da câmara para que o lote possa ser armazenado nela', 'OPERADOR', FALSE),
 ('tb_categoria', 'temperatura_max', 'DECIMAL(5,2)', TRUE, NULL, 'Limite máximo de temperatura da categoria', 'Deve ser menor ou igual ao limite máximo da câmara para que o lote possa ser armazenado nela', 'OPERADOR', FALSE),
-('tb_categoria', 'vida_util_horas', 'DECIMAL(7,2)', TRUE, NULL, 'Vida útil da categoria em horas', 'Base direta do escalonamento do alerta', 'OPERADOR', FALSE),
+('tb_categoria', 'vida_util_horas', 'INTERVAL HOUR TO MINUTE', TRUE, NULL, 'Vida útil da categoria em horas e minutos', 'Valor positivo limitado a menos de 1000 horas (até 999:59); base direta do escalonamento do alerta', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_lote
@@ -88,7 +88,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 ('tb_alerta', 'nivel_atual', 'VARCHAR(8)', TRUE, NULL, 'Cargo responsável pelo alerta no momento', 'Nasce como operador; muda automaticamente por escalonamento (trigger monitora esse campo)', 'OPERADOR', FALSE),
 ('tb_alerta', 'cod_camara_frigorifica', 'INTEGER', TRUE, 'FK', 'Câmara frigorífica que originou o alerta', 'Todo alerta pertence à câmara que originou a ocorrência', 'OPERADOR', FALSE),
-('tb_alerta', 'vida_util_referencia_horas', 'DECIMAL(7,2)', FALSE, NULL, 'Menor vida útil entre os lotes ativos no momento do alerta', 'Base dos prazos fixos de escalonamento', 'GESTOR', FALSE),
+('tb_alerta', 'vida_util_referencia_horas', 'INTERVAL HOUR TO MINUTE', FALSE, NULL, 'Menor vida útil entre os lotes ativos no momento do alerta', 'Quando informada, deve ser positiva e menor que 1000 horas; base dos prazos fixos de escalonamento', 'GESTOR', FALSE),
 ('tb_alerta', 'status', 'VARCHAR(100)', TRUE, NULL, 'Fase do atendimento do alerta', 'Não confundir com nivel_atual: status é sobre o atendimento (ATIVO/RECONHECIDO/RESOLVIDO), nivel_atual é sobre o cargo responsável', 'OPERADOR', FALSE),
 ('tb_alerta', 'nivel_gravidade', 'VARCHAR(100)', TRUE, NULL, 'Gravidade do alerta', 'Calculada via fn_calcular_gravidade_alerta: BAIXA, ATENCAO, URGENTE ou CRITICA', 'OPERADOR', FALSE),
 ('tb_alerta', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento de criação do alerta', 'Usado como referência para o escalonamento', 'OPERADOR', FALSE),

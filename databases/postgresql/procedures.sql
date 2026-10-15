@@ -81,10 +81,10 @@ BEGIN
         v_nivel_novo := NULL;
 
         IF CURRENT_TIMESTAMP >= v_alerta.data_hora
-            + fn_calcular_prazo_escalonamento(v_alerta.id, 70) * INTERVAL '1 hour' THEN
+            + fn_calcular_prazo_escalonamento(v_alerta.id, 70) THEN
             v_nivel_novo := 'ADMIN';
         ELSIF CURRENT_TIMESTAMP >= v_alerta.data_hora
-            + fn_calcular_prazo_escalonamento(v_alerta.id, 40) * INTERVAL '1 hour'
+            + fn_calcular_prazo_escalonamento(v_alerta.id, 40)
             AND v_alerta.nivel_atual = 'OPERADOR' THEN
             v_nivel_novo := 'GESTOR';
         END IF;

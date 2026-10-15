@@ -143,12 +143,12 @@ FROM generate_series(1, 50) AS gs;
 INSERT INTO tb_categoria
     (nome, temperatura_min, temperatura_max, vida_util_horas)
 VALUES
-('Alcatra bovina resfriada', 3.00, 4.50, 240.00),
-('Contrafilé bovino resfriado', 2.00, 6.00, 216.00),
-('Lombo suíno resfriado', 3.00, 4.50, 168.00),
-('Peito de frango resfriado', 3.00, 4.50, 120.00),
-('Filé de tilápia fresco', -2.00, 2.00, 72.00),
-('Filé de salmão congelado', -22.00, -16.00, 720.00);
+('Alcatra bovina resfriada', 3.00, 4.50, INTERVAL '240:00' HOUR TO MINUTE),
+('Contrafilé bovino resfriado', 2.00, 6.00, INTERVAL '216:00' HOUR TO MINUTE),
+('Lombo suíno resfriado', 3.00, 4.50, INTERVAL '168:00' HOUR TO MINUTE),
+('Peito de frango resfriado', 3.00, 4.50, INTERVAL '120:00' HOUR TO MINUTE),
+('Filé de tilápia fresco', -2.00, 2.00, INTERVAL '72:00' HOUR TO MINUTE),
+('Filé de salmão congelado', -22.00, -16.00, INTERVAL '720:00' HOUR TO MINUTE);
 
 
 -- =============================================
@@ -343,6 +343,50 @@ VALUES
 	(33, TRUE, '192.168.1.12', 'Mozilla/5.0', NULL),
 	(52, TRUE, '192.168.1.13', 'Mozilla/5.0', NULL),
 	(42, FALSE, '192.168.1.14', 'Mozilla/5.0', 'Senha incorreta');
+
+
+-- Acessos distribuídos ao longo dos últimos dias para exercitar a view de DAU.
+INSERT INTO tb_log_acesso (
+    cod_usuario, tentativa_sucesso, ip_origem, user_agent,
+    motivo_falha, data_hora
+)
+SELECT
+    ((gs - 1) % 100) + 1,
+    gs % 8 <> 0,
+    ('10.10.0.' || gs)::INET,
+    CASE gs % 3
+        WHEN 0 THEN 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0'
+        WHEN 1 THEN 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/130.0'
+        ELSE 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1'
+    END,
+    CASE
+        WHEN gs % 8 <> 0 THEN NULL
+        WHEN gs % 2 = 0 THEN 'SENHA_INCORRETA'
+        ELSE 'USUARIO_INEXISTENTE'
+    END,
+    CURRENT_TIMESTAMP - (gs * INTERVAL '4 hours')
+FROM generate_series(1, 100) AS gs;
+
+-- Eventos de manutenção e telemetria distribuídos entre os termômetros cadastrados.
+INSERT INTO tb_log_sensor (
+    cod_termometro, tipo_evento, detalhes, data_hora
+)
+SELECT
+    ((gs - 1) % 50) + 1,
+    CASE gs % 4
+        WHEN 0 THEN 'MANUTENCAO'
+        WHEN 1 THEN 'BATERIA'
+        WHEN 2 THEN 'CALIBRACAO'
+        ELSE 'SINAL_INTERMITENTE'
+    END,
+    CASE gs % 4
+        WHEN 0 THEN 'Inspeção preventiva realizada no termômetro.'
+        WHEN 1 THEN 'Nível de bateria verificado durante a rotina de monitoramento.'
+        WHEN 2 THEN 'Calibração periódica registrada pela equipe técnica.'
+        ELSE 'Oscilação temporária de comunicação; sinal restabelecido.'
+    END,
+    CURRENT_TIMESTAMP - (gs * INTERVAL '3 hours')
+FROM generate_series(1, 100) AS gs;
 
 
 COMMIT;

@@ -27,6 +27,8 @@ No legado, as tabelas sincronizadas devem ter `data_atualizacao` preenchida em i
 - `usuario.nivel_acesso` com `super_admin`, quando aplicável;
 - um termômetro por frigorífico.
 
+O RPA lê `vida_util_horas` do legado em horas numéricas e converte para `INTERVAL` ao gravar no PostgreSQL normalizado.
+
 No destino, `tb_controle_rpa` guarda a data da última carga concluída. Exclusões físicas no legado não são sincronizadas.
 
 ## Execução local

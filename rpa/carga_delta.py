@@ -321,7 +321,7 @@ def carregar_categorias(
         INSERT INTO tb_categoria (
             id, nome, temperatura_min, temperatura_max, vida_util_horas
         )
-        VALUES (%s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s::DOUBLE PRECISION * INTERVAL '1 hour')
         ON CONFLICT (id) DO UPDATE
         SET nome = EXCLUDED.nome,
             temperatura_min = EXCLUDED.temperatura_min,

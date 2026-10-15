@@ -1,9 +1,14 @@
+-- O tipo de retorno mudou de DECIMAL para INTERVAL; é necessário remover
+-- as versões anteriores antes de recriá-las.
+DROP FUNCTION IF EXISTS fn_calcular_prazo_escalonamento(INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS fn_calcular_vida_util_camara(INTEGER);
+
 CREATE OR REPLACE FUNCTION fn_calcular_vida_util_camara(
     p_cod_camara INTEGER
 )
-RETURNS DECIMAL(7,2) AS $$
+RETURNS INTERVAL AS $$
 DECLARE
-    v_vida_util DECIMAL(7,2);
+    v_vida_util INTERVAL;
 BEGIN
     SELECT MIN(c.vida_util_horas)
     INTO v_vida_util
@@ -27,9 +32,9 @@ CREATE OR REPLACE FUNCTION fn_calcular_prazo_escalonamento(
     p_cod_alerta INTEGER,
     p_percentual INTEGER
 )
-RETURNS DECIMAL(7,2) AS $$
+RETURNS INTERVAL AS $$
 DECLARE
-    v_vida_util DECIMAL(7,2);
+    v_vida_util INTERVAL;
 BEGIN
     IF p_percentual < 0 OR p_percentual > 100 THEN
         RAISE EXCEPTION 'Percentual de escalonamento inválido. O valor deve estar entre 0 e 100.';
@@ -44,7 +49,10 @@ BEGIN
         RAISE EXCEPTION 'Alerta % não possui vida útil de referência.', p_cod_alerta;
     END IF;
 
-    RETURN v_vida_util * p_percentual / 100;
+    RETURN date_trunc(
+        'minute',
+        v_vida_util * (p_percentual::DOUBLE PRECISION / 100.0)
+    );
 END;
 $$ LANGUAGE plpgsql;
 

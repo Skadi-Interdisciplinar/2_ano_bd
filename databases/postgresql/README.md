@@ -181,6 +181,9 @@ Triggers específicos registram alterações importantes no banco, incluindo ope
 * **`fn_calcular_gravidade_alerta`** — calcula a gravidade do alerta com base na diferença entre a temperatura medida e a temperatura ideal.
 * **`fn_calcular_vida_util_camara`** — identifica a menor vida útil entre os lotes ativos de uma câmara frigorífica.
 * **`fn_calcular_prazo_escalonamento`** — calcula o prazo necessário para o escalonamento do alerta.
+
+As vidas úteis de categorias e alertas são armazenadas como `INTERVAL HOUR TO MINUTE`; os prazos calculados pelas funções também são intervalos, não números de horas.
+
 * **`fn_camara_temperatura_normal`** — verifica se a última leitura da câmara está dentro da faixa permitida.
 
 ### Procedures

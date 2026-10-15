@@ -125,11 +125,14 @@ CREATE TABLE tb_categoria (
 	nome VARCHAR(150) NOT NULL,
 	temperatura_min DECIMAL(5,2) NOT NULL,
 	temperatura_max DECIMAL(5,2) NOT NULL,
-	vida_util_horas DECIMAL(7,2) NOT NULL,
+	vida_util_horas INTERVAL HOUR TO MINUTE NOT NULL,
 
 	CONSTRAINT pk_categoria PRIMARY KEY (id),
 	CONSTRAINT uq_categoria_nome UNIQUE (nome),
-	CONSTRAINT ck_categoria_vida_util CHECK (vida_util_horas > 0),
+	CONSTRAINT ck_categoria_vida_util CHECK (
+		vida_util_horas > INTERVAL '0'
+		AND vida_util_horas < INTERVAL '1000 hours'
+	),
 	CONSTRAINT ck_categoria_faixa_temperatura CHECK (temperatura_min < temperatura_max)
 );
 
@@ -180,7 +183,7 @@ CREATE TABLE tb_lote_camara_frigorifica (
 CREATE TABLE tb_alerta (
 	id SERIAL,
 	cod_camara_frigorifica INTEGER NOT NULL,
-	vida_util_referencia_horas DECIMAL(7,2),
+	vida_util_referencia_horas INTERVAL HOUR TO MINUTE,
 	nivel_atual VARCHAR(8) NOT NULL DEFAULT 'OPERADOR',
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	tipo VARCHAR(100) NOT NULL DEFAULT 'TEMPERATURA_FORA_PADRAO',
@@ -189,6 +192,13 @@ CREATE TABLE tb_alerta (
 
 	CONSTRAINT pk_alerta PRIMARY KEY (id),
 	CONSTRAINT fk_alerta_camara_frigorifica FOREIGN KEY (cod_camara_frigorifica) REFERENCES tb_camara_frigorifica(id),
+	CONSTRAINT ck_alerta_vida_util_referencia CHECK (
+		vida_util_referencia_horas IS NULL
+		OR (
+			vida_util_referencia_horas > INTERVAL '0'
+			AND vida_util_referencia_horas < INTERVAL '1000 hours'
+		)
+	),
 	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('OPERADOR', 'GESTOR', 'ADMIN')),
 	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('BAIXA', 'ATENCAO', 'URGENTE', 'CRITICA')),
 	CONSTRAINT ck_alerta_status CHECK (status IN ('ATIVO', 'RECONHECIDO', 'RESOLVIDO')),
