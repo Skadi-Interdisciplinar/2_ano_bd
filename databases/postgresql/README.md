@@ -85,15 +85,15 @@ A gravidade é calculada pela diferença absoluta entre a temperatura registrada
 
 ### Resolução
 
-A inserção de uma justificativa também dispara um fluxo automático:
+Quando uma leitura normal mais recente é inserida para uma câmara com alerta `ATIVO` ainda não reconhecido, o banco resolve automaticamente o alerta e o atendimento pendente, registrando `data_hora_resolucao`. Se o alerta já estiver `RECONHECIDO`, ele permanece aberto para atendimento e justificativa.
+
+A justificativa continua sendo um fluxo separado para registrar a causa e a ação realizada. Ao inserir uma justificativa, o banco:
 
 ```text id="x9amso"
 justificativa inserida
   → valida se o atendimento está 'em_andamento'
   → verifica se a última temperatura está normalizada
-  → atendimento é marcado como 'resolvido' somente se a câmara estiver normalizada
-  → registra data de resolução
-  → alerta correspondente é marcado como 'resolvido'
+  → se estiver normalizada, marca atendimento e alerta como 'resolvido'
 ```
 
 ---
@@ -120,6 +120,16 @@ O trigger `trg_validar_temperatura_categoria_camara` impede que um lote seja col
 ### Atendimento pendente
 
 `tb_atendimento.cod_usuario` é opcional, pois o atendimento pode ser criado como `pendente` antes de um usuário assumir o alerta.
+
+### Notificações lidas
+
+`tb_notificacao_alerta` mantém um registro por usuário notificado. `data_hora_envio` registra o envio e `data_hora_leitura` registra quando aquele usuário leu a notificação; `data_hora_leitura` permanece `NULL` enquanto não houver leitura.
+
+### Relatórios e assinaturas
+
+`tb_relatorio.conteudo` guarda o texto integral do relatório e `hash_conteudo` guarda seu hash SHA-256. `tb_assinatura.certificado_publico` guarda a chave pública em Base64 (DER/X.509) usada pela aplicação para verificar a assinatura.
+
+As assinaturas e chaves da massa em `dataload.sql` são placeholders e não passam pela verificação criptográfica da API.
 
 ### Escopo do usuário
 
@@ -156,7 +166,7 @@ O trigger relacionado às leituras de temperatura verifica automaticamente se a 
 
 ### Resolução
 
-Quando uma justificativa é inserida, o trigger verifica se o atendimento está `em_andamento` e se a última temperatura da câmara está dentro da faixa normal. Somente nessas condições o atendimento e o alerta correspondente são atualizados para `resolvido`.
+Uma leitura normal mais recente resolve automaticamente somente alertas `ATIVO` ainda não reconhecidos e seus atendimentos `PENDENTE`. Alertas `RECONHECIDO` permanecem para atendimento; o trigger de justificativa pode resolver um atendimento em andamento quando a câmara está normalizada, além de registrar o motivo e a descrição fornecidos.
 
 ### Auditoria e escalonamento
 
@@ -171,6 +181,9 @@ Triggers específicos registram alterações importantes no banco, incluindo ope
 * **`fn_calcular_gravidade_alerta`** — calcula a gravidade do alerta com base na diferença entre a temperatura medida e a temperatura ideal.
 * **`fn_calcular_vida_util_camara`** — identifica a menor vida útil entre os lotes ativos de uma câmara frigorífica.
 * **`fn_calcular_prazo_escalonamento`** — calcula o prazo necessário para o escalonamento do alerta.
+
+As vidas úteis de categorias e alertas são armazenadas como `INTERVAL HOUR TO MINUTE`; os prazos calculados pelas funções também são intervalos, não números de horas.
+
 * **`fn_camara_temperatura_normal`** — verifica se a última leitura da câmara está dentro da faixa permitida.
 
 ### Procedures

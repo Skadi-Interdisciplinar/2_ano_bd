@@ -1,3 +1,4 @@
+DROP VIEW IF EXISTS vw_dau_diario;
 DROP TABLE IF EXISTS tb_log_acesso;
 DROP TABLE IF EXISTS tb_log_auditoria;
 DROP TABLE IF EXISTS tb_log_acesso_relatorio;

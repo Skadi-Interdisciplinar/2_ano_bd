@@ -129,11 +129,14 @@ CREATE TABLE tb_categoria (
 	nome VARCHAR(150) NOT NULL,
 	temperatura_min DECIMAL(5,2) NOT NULL,
 	temperatura_max DECIMAL(5,2) NOT NULL,
-	vida_util_horas DECIMAL(7,2) NOT NULL,
+	vida_util_horas INTERVAL HOUR TO MINUTE NOT NULL,
 
 	CONSTRAINT pk_categoria PRIMARY KEY (id),
 	CONSTRAINT uq_categoria_nome UNIQUE (nome),
-	CONSTRAINT ck_categoria_vida_util CHECK (vida_util_horas > 0),
+	CONSTRAINT ck_categoria_vida_util CHECK (
+		vida_util_horas > INTERVAL '0'
+		AND vida_util_horas < INTERVAL '1000 hours'
+	),
 	CONSTRAINT ck_categoria_faixa_temperatura CHECK (temperatura_min < temperatura_max)
 );
 
@@ -184,7 +187,7 @@ CREATE TABLE tb_lote_camara_frigorifica (
 CREATE TABLE tb_alerta (
 	id SERIAL,
 	cod_camara_frigorifica INTEGER NOT NULL,
-	vida_util_referencia_horas DECIMAL(7,2),
+	vida_util_referencia_horas INTERVAL HOUR TO MINUTE,
 	nivel_atual VARCHAR(8) NOT NULL DEFAULT 'OPERADOR',
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	tipo VARCHAR(100) NOT NULL DEFAULT 'TEMPERATURA_FORA_PADRAO',
@@ -193,6 +196,13 @@ CREATE TABLE tb_alerta (
 
 	CONSTRAINT pk_alerta PRIMARY KEY (id),
 	CONSTRAINT fk_alerta_camara_frigorifica FOREIGN KEY (cod_camara_frigorifica) REFERENCES tb_camara_frigorifica(id),
+	CONSTRAINT ck_alerta_vida_util_referencia CHECK (
+		vida_util_referencia_horas IS NULL
+		OR (
+			vida_util_referencia_horas > INTERVAL '0'
+			AND vida_util_referencia_horas < INTERVAL '1000 hours'
+		)
+	),
 	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('OPERADOR', 'GESTOR', 'ADMIN')),
 	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('BAIXA', 'ATENCAO', 'URGENTE', 'CRITICA')),
 	CONSTRAINT ck_alerta_status CHECK (status IN ('ATIVO', 'RECONHECIDO', 'RESOLVIDO')),
@@ -204,6 +214,7 @@ CREATE TABLE tb_notificacao_alerta (
 	cod_alerta INTEGER NOT NULL,
 	cod_usuario INTEGER NOT NULL,
 	data_hora_envio TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	data_hora_leitura TIMESTAMP,
 
 	CONSTRAINT pk_notificacao_alerta PRIMARY KEY (id),
 	CONSTRAINT fk_notificacao_alerta FOREIGN KEY (cod_alerta) REFERENCES tb_alerta(id),
@@ -254,12 +265,14 @@ CREATE TABLE tb_relatorio (
 	cod_usuario_gerador INTEGER NOT NULL,
 	data_hora_geracao TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	hash_conteudo VARCHAR(64) NOT NULL,
+	conteudo TEXT NOT NULL,
 	periodo_inicio DATE NOT NULL,
 	periodo_fim DATE NOT NULL,
 	status VARCHAR(50) NOT NULL,
 
 	CONSTRAINT pk_relatorio PRIMARY KEY (id),
 	CONSTRAINT fk_relatorio_usuario FOREIGN KEY (cod_usuario_gerador) REFERENCES tb_usuario(id),
+	CONSTRAINT ck_relatorio_periodo CHECK (periodo_fim >= periodo_inicio),
 	CONSTRAINT ck_relatorio_status CHECK (status IN ('GERADO', 'ASSINADO', 'ARQUIVADO'))
 );
 
@@ -270,6 +283,7 @@ CREATE TABLE tb_assinatura (
 	numero_serie VARCHAR(64) NOT NULL,
 	autoridade_certificadora VARCHAR(255) NOT NULL,
 	algoritmo_assinatura VARCHAR(50) NOT NULL,
+	certificado_publico TEXT NOT NULL,
 	assinatura TEXT NOT NULL,
 	data_assinatura DATE NOT NULL DEFAULT CURRENT_DATE,
 	carimbo_tempo TEXT NOT NULL,
@@ -283,12 +297,17 @@ CREATE TABLE tb_assinatura (
 -- DEPLOY: functions.sql
 -- ====================================================================
 
+-- O tipo de retorno mudou de DECIMAL para INTERVAL; é necessário remover
+-- as versões anteriores antes de recriá-las.
+DROP FUNCTION IF EXISTS fn_calcular_prazo_escalonamento(INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS fn_calcular_vida_util_camara(INTEGER);
+
 CREATE OR REPLACE FUNCTION fn_calcular_vida_util_camara(
     p_cod_camara INTEGER
 )
-RETURNS DECIMAL(7,2) AS $$
+RETURNS INTERVAL AS $$
 DECLARE
-    v_vida_util DECIMAL(7,2);
+    v_vida_util INTERVAL;
 BEGIN
     SELECT MIN(c.vida_util_horas)
     INTO v_vida_util
@@ -312,9 +331,9 @@ CREATE OR REPLACE FUNCTION fn_calcular_prazo_escalonamento(
     p_cod_alerta INTEGER,
     p_percentual INTEGER
 )
-RETURNS DECIMAL(7,2) AS $$
+RETURNS INTERVAL AS $$
 DECLARE
-    v_vida_util DECIMAL(7,2);
+    v_vida_util INTERVAL;
 BEGIN
     IF p_percentual < 0 OR p_percentual > 100 THEN
         RAISE EXCEPTION 'Percentual de escalonamento inválido. O valor deve estar entre 0 e 100.';
@@ -329,7 +348,10 @@ BEGIN
         RAISE EXCEPTION 'Alerta % não possui vida útil de referência.', p_cod_alerta;
     END IF;
 
-    RETURN v_vida_util * p_percentual / 100;
+    RETURN date_trunc(
+        'minute',
+        v_vida_util * (p_percentual::DOUBLE PRECISION / 100.0)
+    );
 END;
 $$ LANGUAGE plpgsql;
 
@@ -495,10 +517,10 @@ BEGIN
         v_nivel_novo := NULL;
 
         IF CURRENT_TIMESTAMP >= v_alerta.data_hora
-            + fn_calcular_prazo_escalonamento(v_alerta.id, 70) * INTERVAL '1 hour' THEN
+            + fn_calcular_prazo_escalonamento(v_alerta.id, 70) THEN
             v_nivel_novo := 'ADMIN';
         ELSIF CURRENT_TIMESTAMP >= v_alerta.data_hora
-            + fn_calcular_prazo_escalonamento(v_alerta.id, 40) * INTERVAL '1 hour'
+            + fn_calcular_prazo_escalonamento(v_alerta.id, 40)
             AND v_alerta.nivel_atual = 'OPERADOR' THEN
             v_nivel_novo := 'GESTOR';
         END IF;
@@ -624,7 +646,9 @@ DROP TRIGGER IF EXISTS trg_criar_atendimento_pendente ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_resolver_atendimento_por_justificativa ON tb_justificativa;
 DROP TRIGGER IF EXISTS trg_validar_temperatura_categoria_camara ON tb_lote_camara_frigorifica;
 DROP TRIGGER IF EXISTS trg_gerar_alerta_por_leitura ON tb_leitura_temperatura;
+DROP TRIGGER IF EXISTS trg_resolver_alerta_por_leitura_normal ON tb_leitura_temperatura;
 DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
+DROP TRIGGER IF EXISTS trg_impedir_alerta_aberto_camara ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_validar_gestor_usuario ON tb_usuario;
 DROP TRIGGER IF EXISTS trg_validar_solicitacao_suporte ON tb_solicitacao_suporte;
 
@@ -843,20 +867,23 @@ BEGIN
             'O atendimento precisa estar em andamento para ser resolvido.';
     END IF;
 
-    IF fn_camara_temperatura_normal(
+    IF NOT fn_camara_temperatura_normal(
         v_cod_camara,
         CURRENT_TIMESTAMP::TIMESTAMP
     ) THEN
-
-        UPDATE tb_atendimento
-           SET status = 'RESOLVIDO',
-               data_hora_resolucao = CURRENT_TIMESTAMP
-         WHERE id = NEW.cod_atendimento;
-
-        UPDATE tb_alerta
-           SET status = 'RESOLVIDO'
-         WHERE id = v_cod_alerta;
+        RAISE EXCEPTION
+            'A temperatura da câmara frigorífica % precisa estar dentro dos limites para registrar a justificativa.',
+            v_cod_camara;
     END IF;
+
+    UPDATE tb_atendimento
+       SET status = 'RESOLVIDO',
+           data_hora_resolucao = CURRENT_TIMESTAMP
+     WHERE id = NEW.cod_atendimento;
+
+    UPDATE tb_alerta
+       SET status = 'RESOLVIDO'
+     WHERE id = v_cod_alerta;
 
     RETURN NEW;
 END;
@@ -921,7 +948,7 @@ DECLARE
     v_temperatura_min DECIMAL(5,2);
     v_temperatura_max DECIMAL(5,2);
     v_gravidade VARCHAR(20);
-    v_vida_util DECIMAL(7,2);
+    v_vida_util INTERVAL;
     v_alerta INTEGER;
 BEGIN
     SELECT cam.id, cam.temperatura_min, cam.temperatura_max
@@ -972,6 +999,56 @@ AFTER INSERT ON tb_leitura_temperatura
 FOR EACH ROW EXECUTE FUNCTION fn_gerar_alerta_por_leitura();
 
 
+CREATE OR REPLACE FUNCTION fn_resolver_alerta_por_leitura_normal()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_camara INTEGER;
+    v_temperatura_min DECIMAL(5,2);
+    v_temperatura_max DECIMAL(5,2);
+BEGIN
+    SELECT cam.id, cam.temperatura_min, cam.temperatura_max
+      INTO v_camara, v_temperatura_min, v_temperatura_max
+      FROM tb_camara_frigorifica cam
+     WHERE cam.cod_termometro = NEW.cod_termometro;
+
+    IF v_camara IS NULL
+       OR NEW.temperatura < v_temperatura_min
+       OR NEW.temperatura > v_temperatura_max THEN
+        RETURN NEW;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+          FROM tb_leitura_temperatura posterior
+         WHERE posterior.cod_termometro = NEW.cod_termometro
+           AND (posterior.data_hora, posterior.id) > (NEW.data_hora, NEW.id)
+    ) THEN
+        RETURN NEW;
+    END IF;
+
+    UPDATE tb_atendimento atd
+       SET status = 'RESOLVIDO',
+           data_hora_resolucao = CURRENT_TIMESTAMP
+      FROM tb_alerta a
+     WHERE a.id = atd.cod_alerta
+       AND a.cod_camara_frigorifica = v_camara
+       AND a.status = 'ATIVO'
+       AND atd.status = 'PENDENTE';
+
+    UPDATE tb_alerta
+       SET status = 'RESOLVIDO'
+     WHERE cod_camara_frigorifica = v_camara
+       AND status = 'ATIVO';
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_resolver_alerta_por_leitura_normal
+AFTER INSERT ON tb_leitura_temperatura
+FOR EACH ROW EXECUTE FUNCTION fn_resolver_alerta_por_leitura_normal();
+
+
 CREATE OR REPLACE FUNCTION fn_impedir_alerta_aberto_camara()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -998,7 +1075,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_impedir_alerta_aberto_camara();
 CREATE OR REPLACE FUNCTION fn_notificar_novo_alerta()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_horas_prazo DECIMAL(7,2);
+    v_horas_prazo INTERVAL;
 BEGIN
     v_horas_prazo := fn_calcular_prazo_escalonamento(NEW.id, 40);
 
@@ -1008,7 +1085,7 @@ BEGIN
             'id_alerta', NEW.id,
             'prazo_epoch',
             EXTRACT(EPOCH FROM (
-                NEW.data_hora + v_horas_prazo * INTERVAL '1 hour'
+                NEW.data_hora + v_horas_prazo
             ) AT TIME ZONE 'America/Sao_Paulo')
         )::text
     );
@@ -1026,6 +1103,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_notificar_novo_alerta();
 -- DEPLOY: audit.sql
 -- ====================================================================
 
+DROP VIEW IF EXISTS vw_dau_diario;
 DROP TABLE IF EXISTS tb_log_acesso;
 DROP TABLE IF EXISTS tb_log_auditoria;
 DROP TABLE IF EXISTS tb_log_acesso_relatorio;
@@ -1229,7 +1307,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_categoria', 'nome', 'VARCHAR(150)', TRUE, 'NK', 'Categoria de armazenamento', 'Única no sistema; concentra os parâmetros comuns aos lotes', 'OPERADOR', FALSE),
 ('tb_categoria', 'temperatura_min', 'DECIMAL(5,2)', TRUE, NULL, 'Limite mínimo de temperatura da categoria', 'Deve ser maior ou igual ao limite mínimo da câmara para que o lote possa ser armazenado nela', 'OPERADOR', FALSE),
 ('tb_categoria', 'temperatura_max', 'DECIMAL(5,2)', TRUE, NULL, 'Limite máximo de temperatura da categoria', 'Deve ser menor ou igual ao limite máximo da câmara para que o lote possa ser armazenado nela', 'OPERADOR', FALSE),
-('tb_categoria', 'vida_util_horas', 'DECIMAL(7,2)', TRUE, NULL, 'Vida útil da categoria em horas', 'Base direta do escalonamento do alerta', 'OPERADOR', FALSE),
+('tb_categoria', 'vida_util_horas', 'INTERVAL HOUR TO MINUTE', TRUE, NULL, 'Vida útil da categoria em horas e minutos', 'Valor positivo limitado a menos de 1000 horas (até 999:59); base direta do escalonamento do alerta', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_lote
@@ -1257,7 +1335,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 ('tb_alerta', 'nivel_atual', 'VARCHAR(8)', TRUE, NULL, 'Cargo responsável pelo alerta no momento', 'Nasce como operador; muda automaticamente por escalonamento (trigger monitora esse campo)', 'OPERADOR', FALSE),
 ('tb_alerta', 'cod_camara_frigorifica', 'INTEGER', TRUE, 'FK', 'Câmara frigorífica que originou o alerta', 'Todo alerta pertence à câmara que originou a ocorrência', 'OPERADOR', FALSE),
-('tb_alerta', 'vida_util_referencia_horas', 'DECIMAL(7,2)', FALSE, NULL, 'Menor vida útil entre os lotes ativos no momento do alerta', 'Base dos prazos fixos de escalonamento', 'GESTOR', FALSE),
+('tb_alerta', 'vida_util_referencia_horas', 'INTERVAL HOUR TO MINUTE', FALSE, NULL, 'Menor vida útil entre os lotes ativos no momento do alerta', 'Quando informada, deve ser positiva e menor que 1000 horas; base dos prazos fixos de escalonamento', 'GESTOR', FALSE),
 ('tb_alerta', 'status', 'VARCHAR(100)', TRUE, NULL, 'Fase do atendimento do alerta', 'Não confundir com nivel_atual: status é sobre o atendimento (ATIVO/RECONHECIDO/RESOLVIDO), nivel_atual é sobre o cargo responsável', 'OPERADOR', FALSE),
 ('tb_alerta', 'nivel_gravidade', 'VARCHAR(100)', TRUE, NULL, 'Gravidade do alerta', 'Calculada via fn_calcular_gravidade_alerta: BAIXA, ATENCAO, URGENTE ou CRITICA', 'OPERADOR', FALSE),
 ('tb_alerta', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento de criação do alerta', 'Usado como referência para o escalonamento', 'OPERADOR', FALSE),
@@ -1269,6 +1347,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_notificacao_alerta', 'cod_alerta', 'INTEGER', TRUE, 'FK', 'Alerta notificado', 'Relaciona a notificação ao alerta correspondente', 'OPERADOR', FALSE),
 ('tb_notificacao_alerta', 'cod_usuario', 'INTEGER', TRUE, 'FK', 'Usuário notificado', 'Usuário do mesmo CD e nível de acesso do escalonamento', 'OPERADOR', FALSE),
 ('tb_notificacao_alerta', 'data_hora_envio', 'TIMESTAMP', TRUE, NULL, 'Momento do registro da notificação', 'Usado para histórico de envio das notificações push', 'OPERADOR', FALSE),
+('tb_notificacao_alerta', 'data_hora_leitura', 'TIMESTAMP', FALSE, NULL, 'Momento em que o usuário leu a notificação', 'NULL enquanto a notificação não tiver sido lida; permite medir leitura antes do reconhecimento do alerta', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_leitura_temperatura
@@ -1290,12 +1369,13 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 -- tb_justificativa
 -- ==============================================
-('tb_justificativa', 'cod_atendimento', 'INTEGER', TRUE, 'FK', 'Atendimento ao qual a justificativa se refere', 'Ao ser inserida, dispara trigger que valida a temperatura e resolve o atendimento somente se ele estiver em andamento e a câmara estiver normalizada', 'OPERADOR', FALSE),
+('tb_justificativa', 'cod_atendimento', 'INTEGER', TRUE, 'FK', 'Atendimento ao qual a justificativa se refere', 'Registra a justificativa do atendimento; a normalização também pode resolver alerta e atendimento automaticamente ao inserir uma leitura normal mais recente', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_relatorio
 -- ==============================================
 ('tb_relatorio', 'hash_conteudo', 'VARCHAR(64)', TRUE, NULL, 'Hash SHA-256 do conteúdo do relatório', 'Garante integridade: qualquer alteração no conteúdo altera o hash, evidenciando adulteração', 'ADMIN', TRUE),
+('tb_relatorio', 'conteudo', 'TEXT', TRUE, NULL, 'Conteúdo integral do relatório', 'Armazena o relatório cujo hash SHA-256 é mantido em hash_conteudo', 'GESTOR', TRUE),
 ('tb_relatorio', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do relatório', 'GERADO -> ASSINADO -> ARQUIVADO', 'GESTOR', FALSE),
 ('tb_relatorio', 'periodo_inicio', 'DATE', TRUE, NULL, 'Início do intervalo coberto pelo relatório', 'Sem DEFAULT de propósito: força quem gera o relatório a informar o período explicitamente', 'GESTOR', FALSE),
 ('tb_relatorio', 'periodo_fim', 'DATE', TRUE, NULL, 'Fim do intervalo coberto pelo relatório', 'Sem DEFAULT de propósito: evita relatório de período incorreto por esquecimento', 'GESTOR', FALSE),
@@ -1304,6 +1384,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- tb_assinatura
 -- ==============================================
 ('tb_assinatura', 'numero_serie', 'VARCHAR(64)', TRUE, NULL, 'Número de série do certificado ICP-Brasil', 'Identifica unicamente o certificado usado para dar validade jurídica ao relatório', 'ADMIN', TRUE),
+('tb_assinatura', 'certificado_publico', 'TEXT', TRUE, NULL, 'Chave pública usada para verificar a assinatura digital', 'Armazenada em Base64 (DER/X.509) para verificação criptográfica da assinatura', 'ADMIN', FALSE),
 ('tb_assinatura', 'carimbo_tempo', 'TEXT', TRUE, NULL, 'Token de carimbo de tempo (RFC 3161)', 'Emitido por Autoridade de Carimbo do Tempo externa; garante quando a assinatura ocorreu, de forma não manipulável', 'ADMIN', TRUE),
 
 -- ==============================================
@@ -1809,12 +1890,12 @@ FROM generate_series(1, 50) AS gs;
 INSERT INTO tb_categoria
     (nome, temperatura_min, temperatura_max, vida_util_horas)
 VALUES
-('Alcatra bovina resfriada', 3.00, 4.50, 240.00),
-('Contrafilé bovino resfriado', 2.00, 6.00, 216.00),
-('Lombo suíno resfriado', 3.00, 4.50, 168.00),
-('Peito de frango resfriado', 3.00, 4.50, 120.00),
-('Filé de tilápia fresco', -2.00, 2.00, 72.00),
-('Filé de salmão congelado', -22.00, -16.00, 720.00);
+('Alcatra bovina resfriada', 3.00, 4.50, INTERVAL '240:00' HOUR TO MINUTE),
+('Contrafilé bovino resfriado', 2.00, 6.00, INTERVAL '216:00' HOUR TO MINUTE),
+('Lombo suíno resfriado', 3.00, 4.50, INTERVAL '168:00' HOUR TO MINUTE),
+('Peito de frango resfriado', 3.00, 4.50, INTERVAL '120:00' HOUR TO MINUTE),
+('Filé de tilápia fresco', -2.00, 2.00, INTERVAL '72:00' HOUR TO MINUTE),
+('Filé de salmão congelado', -22.00, -16.00, INTERVAL '720:00' HOUR TO MINUTE);
 
 
 -- =============================================
@@ -1882,107 +1963,7 @@ VALUES
 -- 9. LEITURAS DE TEMPERATURA
 -- =============================================
 
--- 9.1 Leituras normais (dentro da faixa, não geram alerta)
-INSERT INTO tb_leitura_temperatura
-    (cod_termometro, temperatura, data_hora)
-VALUES
--- Câmara frigorífica 1 - faixa: 3°C a 4,5°C
-(1, 4.00, '2026-08-30 08:00:00'),
-(1, 4.50, '2026-08-30 20:00:00'),
-(1, 3.80, '2026-08-31 08:00:00'),
-(1, 4.20, '2026-08-31 20:00:00'),
-(1, 4.10, '2026-09-01 08:00:00'),
-(1, 3.90, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 2 - faixa: 2°C a 6°C
-(2, 3.50, '2026-08-30 08:00:00'),
-(2, 4.00, '2026-08-30 20:00:00'),
-(2, 4.30, '2026-08-31 08:00:00'),
-(2, 3.70, '2026-08-31 20:00:00'),
-(2, 4.20, '2026-09-01 08:00:00'),
-(2, 3.80, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 3 - faixa: 2°C a 6°C
-(3, 4.20, '2026-08-30 08:00:00'),
-(3, 3.80, '2026-08-30 20:00:00'),
-(3, 4.50, '2026-08-31 08:00:00'),
-(3, 4.00, '2026-08-31 20:00:00'),
-(3, 3.60, '2026-09-01 08:00:00'),
-(3, 4.40, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 4 - faixa: 2°C a 6°C
-(4, 3.90, '2026-08-30 08:00:00'),
-(4, 4.10, '2026-08-30 20:00:00'),
-(4, 4.40, '2026-08-31 08:00:00'),
-(4, 3.60, '2026-08-31 20:00:00'),
-(4, 4.00, '2026-09-01 08:00:00'),
-(4, 4.30, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 5 - faixa: 2°C a 6°C
-(5, 4.00, '2026-08-30 08:00:00'),
-(5, 4.30, '2026-08-30 20:00:00'),
-(5, 3.70, '2026-08-31 08:00:00'),
-(5, 4.20, '2026-08-31 20:00:00'),
-(5, 3.90, '2026-09-01 08:00:00'),
-(5, 4.10, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 6 - faixa: 2°C a 6°C
-(6, 3.80, '2026-08-30 08:00:00'),
-(6, 4.10, '2026-08-30 20:00:00'),
-(6, 4.50, '2026-08-31 08:00:00'),
-(6, 3.90, '2026-08-31 20:00:00'),
-(6, 4.20, '2026-09-01 08:00:00'),
-(6, 3.70, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 7 - faixa: -2°C a 2°C
-(7, 0.00, '2026-08-30 08:00:00'),
-(7, -0.50, '2026-08-30 20:00:00'),
-(7, 0.50, '2026-08-31 08:00:00'),
-(7, -1.00, '2026-08-31 20:00:00'),
-(7, 0.20, '2026-09-01 08:00:00'),
-(7, -0.30, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 8 - faixa: -2°C a 2°C
-(8, 0.50, '2026-08-30 08:00:00'),
-(8, -0.20, '2026-08-30 20:00:00'),
-(8, 0.80, '2026-08-31 08:00:00'),
-(8, -0.70, '2026-08-31 20:00:00'),
-(8, 0.30, '2026-09-01 08:00:00'),
-(8, -0.40, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 9 - faixa: -2°C a 2°C
-(9, -0.50, '2026-08-30 08:00:00'),
-(9, 0.00, '2026-08-30 20:00:00'),
-(9, 0.70, '2026-08-31 08:00:00'),
-(9, -0.30, '2026-08-31 20:00:00'),
-(9, 0.40, '2026-09-01 08:00:00'),
-(9, -0.80, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 10 - faixa: -22°C a -16°C
-(10, -18.00, '2026-08-30 08:00:00'),
-(10, -19.00, '2026-08-30 20:00:00'),
-(10, -17.50, '2026-08-31 08:00:00'),
-(10, -18.50, '2026-08-31 20:00:00'),
-(10, -20.00, '2026-09-01 08:00:00'),
-(10, -17.00, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 11 - faixa: -22°C a -16°C
-(11, -18.50, '2026-08-30 08:00:00'),
-(11, -19.50, '2026-08-30 20:00:00'),
-(11, -17.00, '2026-08-31 08:00:00'),
-(11, -18.00, '2026-08-31 20:00:00'),
-(11, -20.50, '2026-09-01 08:00:00'),
-(11, -17.50, '2026-09-01 20:00:00'),
-
--- Câmara frigorífica 12 - faixa: -22°C a -16°C
-(12, -19.00, '2026-08-30 08:00:00'),
-(12, -18.00, '2026-08-30 20:00:00'),
-(12, -17.50, '2026-08-31 08:00:00'),
-(12, -20.00, '2026-08-31 20:00:00'),
-(12, -18.50, '2026-09-01 08:00:00'),
-(12, -17.00, '2026-09-01 20:00:00');
-
--- 9.2 Leituras fora da faixa (geram alerta via trigger, um exemplo por gravidade)
+-- Leituras fora da faixa: cada uma gera um alerta via trigger.
 INSERT INTO tb_leitura_temperatura
     (cod_termometro, temperatura, data_hora)
 VALUES
@@ -1998,37 +1979,11 @@ VALUES
 -- Câmara frigorífica 10 | Limite máximo: -16°C | Diferença: 8°C | Gravidade Crítica
 (10, -8.00, '2026-09-02 09:30:00');
 
--- 9.3 Histórico adicional (mais dias de leituras normais, dentro da faixa de cada câmara frigorífica)
-INSERT INTO tb_leitura_temperatura (cod_termometro, temperatura, data_hora)
-SELECT
-    r.cod_termometro,
-    round(
-        (
-            r.temperatura_min
-            + (r.temperatura_max - r.temperatura_min)
-            * (0.3 + 0.4 * random())
-        )::numeric,
-        2
-    ),
-    TIMESTAMP '2026-08-20 08:00:00'
-        + ((gs / 3) || ' days')::interval
-        + (((gs % 3) * 8) || ' hours')::interval
-FROM tb_camara_frigorifica r,
-     generate_series(0, 29) AS gs;
-
-
 -- =============================================
--- 10. FLUXO DE ATENDIMENTO (exemplo sobre os alertas gerados na seção 9.2)
+-- 10. RECONHECIMENTO DE ALERTA (exemplo)
 -- =============================================
-
--- Leitura normal após o alerta da câmara frigorífica 1.
--- Permite que a justificativa seguinte encerre o atendimento e o alerta.
-INSERT INTO tb_leitura_temperatura
-    (cod_termometro, temperatura, data_hora)
-VALUES
-(1, 4.20, '2026-09-02 09:00:00');
-
--- Reconhece e resolve o alerta de gravidade "baixa" (câmara frigorífica 1)
+-- Reconhece o alerta da câmara frigorífica 1; a resolução automática
+-- ocorre quando uma leitura posterior registrar temperatura dentro da faixa.
 DO $$
 DECLARE
     v_cod_alerta INTEGER;
@@ -2042,19 +1997,6 @@ BEGIN
 
     CALL sp_reconhecer_alerta(v_cod_alerta, 61);
 END $$;
-
-INSERT INTO tb_justificativa (
-    cod_atendimento, motivo, descricao
-)
-VALUES (
-    (SELECT a.id
-     FROM tb_atendimento a
-     JOIN tb_alerta al ON al.id = a.cod_alerta
-     WHERE al.cod_camara_frigorifica = 1
-     ORDER BY a.id DESC LIMIT 1),
-    'Porta aberta para reposição',
-    'Alerta gerado durante reposição manual de estoque; temperatura normalizada após fechamento da câmara.'
-);
 
 -- Reconhece o alerta crítico do câmara frigorífica 10, sem resolver
 DO $$
@@ -2076,25 +2018,26 @@ END $$;
 -- 11. RELATÓRIOS
 -- =============================================
 INSERT INTO tb_relatorio (
-    cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status
+    cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status, conteudo
 )
 VALUES
-(2, 'a1b2c3d4e5f67890123456789012345678901234567890123456789012345678', '2026-08-01', '2026-08-31', 'GERADO'),
-(3, 'b2c3d4e5f678901234567890123456789012345678901234567890123456789', '2026-08-01', '2026-08-31', 'ASSINADO'),
-(4, 'c3d4e5f6789012345678901234567890123456789012345678901234567890', '2026-07-01', '2026-07-31', 'ARQUIVADO');
+(2, 'e59d3e70d8e55ce6fc36361645a3708294c6c4e5971a1ea0cf7844a4c7d6d862', '2026-08-01', '2026-08-31', 'GERADO', 'Relatorio operacional do periodo de agosto de 2026 - usuario 2.'),
+(3, '998be91f97fd94a6e41e184ece055dd2a3d30fa1a36beda81784fde6ce0d259c', '2026-08-01', '2026-08-31', 'ASSINADO', 'Relatorio operacional do periodo de agosto de 2026 - usuario 3.'),
+(4, '13c895e9b2a36953fe26ce97179eb2297eecfffa5a5205d0f2912cd6d41c0a9a', '2026-07-01', '2026-07-31', 'ARQUIVADO', 'Relatorio operacional do periodo de julho de 2026 - usuario 4.');
 
 
 -- =============================================
 -- 12. ASSINATURAS
 -- =============================================
+-- Chaves e assinaturas são placeholders de carga; não servem para validação criptográfica.
 INSERT INTO tb_assinatura (
     cod_relatorio, certificado_titular, numero_serie,
-    autoridade_certificadora, algoritmo_assinatura,
+    autoridade_certificadora, algoritmo_assinatura, certificado_publico,
     assinatura, carimbo_tempo
 )
 VALUES
-(2, 'Sistema ColdChain', 'CERT-2026-0001', 'ICP-Brasil', 'SHA256withRSA', 'assinatura_simulada_relatorio_2', '2026-09-02 10:00:00'),
-(3, 'Sistema ColdChain', 'CERT-2026-0002', 'ICP-Brasil', 'SHA256withRSA', 'assinatura_simulada_relatorio_3', '2026-09-02 10:05:00');
+(2, 'Sistema ColdChain', 'CERT-2026-0001', 'ICP-Brasil', 'SHA256withRSA', 'CHAVE_PUBLICA_DE_TESTE_NAO_UTILIZAR', 'assinatura_simulada_relatorio_2', '2026-09-02 10:00:00'),
+(3, 'Sistema ColdChain', 'CERT-2026-0002', 'ICP-Brasil', 'SHA256withRSA', 'CHAVE_PUBLICA_DE_TESTE_NAO_UTILIZAR', 'assinatura_simulada_relatorio_3', '2026-09-02 10:05:00');
 
 
 -- =============================================
@@ -2147,6 +2090,49 @@ VALUES
 	(33, TRUE, '192.168.1.12', 'Mozilla/5.0', NULL),
 	(52, TRUE, '192.168.1.13', 'Mozilla/5.0', NULL),
 	(42, FALSE, '192.168.1.14', 'Mozilla/5.0', 'Senha incorreta');
+
+-- Acessos distribuídos ao longo dos últimos dias para exercitar a view de DAU.
+INSERT INTO tb_log_acesso (
+    cod_usuario, tentativa_sucesso, ip_origem, user_agent,
+    motivo_falha, data_hora
+)
+SELECT
+    ((gs - 1) % 100) + 1,
+    gs % 8 <> 0,
+    ('10.10.0.' || gs)::INET,
+    CASE gs % 3
+        WHEN 0 THEN 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0'
+        WHEN 1 THEN 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/130.0'
+        ELSE 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1'
+    END,
+    CASE
+        WHEN gs % 8 <> 0 THEN NULL
+        WHEN gs % 2 = 0 THEN 'SENHA_INCORRETA'
+        ELSE 'USUARIO_INEXISTENTE'
+    END,
+    CURRENT_TIMESTAMP - (gs * INTERVAL '4 hours')
+FROM generate_series(1, 100) AS gs;
+
+-- Eventos de manutenção e telemetria distribuídos entre os termômetros cadastrados.
+INSERT INTO tb_log_sensor (
+    cod_termometro, tipo_evento, detalhes, data_hora
+)
+SELECT
+    ((gs - 1) % 50) + 1,
+    CASE gs % 4
+        WHEN 0 THEN 'MANUTENCAO'
+        WHEN 1 THEN 'BATERIA'
+        WHEN 2 THEN 'CALIBRACAO'
+        ELSE 'SINAL_INTERMITENTE'
+    END,
+    CASE gs % 4
+        WHEN 0 THEN 'Inspeção preventiva realizada no termômetro.'
+        WHEN 1 THEN 'Nível de bateria verificado durante a rotina de monitoramento.'
+        WHEN 2 THEN 'Calibração periódica registrada pela equipe técnica.'
+        ELSE 'Oscilação temporária de comunicação; sinal restabelecido.'
+    END,
+    CURRENT_TIMESTAMP - (gs * INTERVAL '3 hours')
+FROM generate_series(1, 100) AS gs;
 
 
 COMMIT;

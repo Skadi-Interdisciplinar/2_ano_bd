@@ -6,16 +6,24 @@ import os
 from collections.abc import Iterable
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import psycopg
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-DATABASE_URL = os.environ["DATABASE_URL"]
-NEO4J_URI = os.environ.get("NEO4J_URI", "neo4j://localhost:7687")
+POSTGRES_CONFIG = {
+    "host": os.environ["POSTGRES_HOST"],
+    "port": int(os.getenv("POSTGRES_PORT", "16590")),
+    "dbname": os.environ["POSTGRES_DB"],
+    "user": os.environ["POSTGRES_USER"],
+    "password": os.environ["POSTGRES_PASSWORD"],
+    "sslmode": os.getenv("POSTGRES_SSLMODE", "require"),
+}
+NEO4J_URI = os.getenv("NEO4J_URI", "neo4j://localhost:7687")
 NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.environ["NEO4J_PASSWORD"]
 NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
@@ -46,7 +54,7 @@ def write_batches(session: Any, query: str, rows: Iterable[dict[str, Any]]) -> N
 
 
 def sync() -> None:
-    with psycopg.connect(DATABASE_URL) as postgres:
+    with psycopg.connect(**POSTGRES_CONFIG) as postgres:
         data = {
             "cds": fetch_rows(postgres, "SELECT id, nome, cnpj FROM tb_cd"),
             "camaras": fetch_rows(
@@ -63,7 +71,8 @@ def sync() -> None:
             "categorias": fetch_rows(
                 postgres,
                 """
-                SELECT id, nome, temperatura_ideal, vida_util_horas
+                SELECT id, nome, temperatura_ideal,
+                       EXTRACT(EPOCH FROM vida_util_horas) / 3600.0 AS vida_util_horas
                 FROM tb_categoria
                 """,
             ),
@@ -94,7 +103,9 @@ def sync() -> None:
                 postgres,
                 """
                 SELECT id, cod_camara_frigorifica,
-                       vida_util_referencia_horas, nivel_atual,
+                       EXTRACT(EPOCH FROM vida_util_referencia_horas) / 3600.0
+                           AS vida_util_referencia_horas,
+                       nivel_atual,
                        data_hora, tipo, nivel_gravidade, status
                 FROM tb_alerta
                 """,

@@ -8,7 +8,6 @@ necessários para o funcionamento da Inteligência Artificial.
 | Arquivo | Responsabilidade |
 | --- | --- |
 | `criar_mongodb.py` | Cria as collections, aplica validações e cria índices. |
-| `.env.example` | Modelo das variáveis de conexão, sem credenciais reais. |
 | `requirements.txt` | Dependências necessárias para executar o script. |
 
 ## Responsabilidades
@@ -64,9 +63,9 @@ referências deve ocorrer antes da gravação, na camada da aplicação.
 
 ## Execução
 
-1. Copie `.env.example` para `.env` e informe a URL real do MongoDB.
+1. Na raiz do repositório, copie `.env.example` para `.env` e preencha `MONGODB_URI`.
 2. Instale as dependências de `requirements.txt`.
-3. Execute `python criar_mongodb.py` dentro desta pasta.
+3. Execute `python databases/mongodb/criar_mongodb.py` a partir da raiz do repositório.
 
 O script pode ser executado novamente: ele mantém collections existentes,
 reaplica as validações e evita duplicar índices. Ele não apaga collections nem
@@ -80,5 +79,4 @@ ou tipos esperados são rejeitados pelo MongoDB.
 
 ## Segurança
 
-O arquivo `.env` contém credenciais e não deve ser versionado. Use somente o
-`.env.example` como modelo compartilhado no repositório.
+O arquivo `.env` da raiz contém credenciais e não deve ser versionado. Use `.env.example` como modelo compartilhado no repositório.

@@ -2,7 +2,9 @@ DROP TRIGGER IF EXISTS trg_criar_atendimento_pendente ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_resolver_atendimento_por_justificativa ON tb_justificativa;
 DROP TRIGGER IF EXISTS trg_validar_temperatura_categoria_camara ON tb_lote_camara_frigorifica;
 DROP TRIGGER IF EXISTS trg_gerar_alerta_por_leitura ON tb_leitura_temperatura;
+DROP TRIGGER IF EXISTS trg_resolver_alerta_por_leitura_normal ON tb_leitura_temperatura;
 DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
+DROP TRIGGER IF EXISTS trg_impedir_alerta_aberto_camara ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_validar_gestor_usuario ON tb_usuario;
 DROP TRIGGER IF EXISTS trg_validar_solicitacao_suporte ON tb_solicitacao_suporte;
 
@@ -221,20 +223,23 @@ BEGIN
             'O atendimento precisa estar em andamento para ser resolvido.';
     END IF;
 
-    IF fn_camara_temperatura_normal(
+    IF NOT fn_camara_temperatura_normal(
         v_cod_camara,
         CURRENT_TIMESTAMP::TIMESTAMP
     ) THEN
-
-        UPDATE tb_atendimento
-           SET status = 'RESOLVIDO',
-               data_hora_resolucao = CURRENT_TIMESTAMP
-         WHERE id = NEW.cod_atendimento;
-
-        UPDATE tb_alerta
-           SET status = 'RESOLVIDO'
-         WHERE id = v_cod_alerta;
+        RAISE EXCEPTION
+            'A temperatura da câmara frigorífica % precisa estar dentro dos limites para registrar a justificativa.',
+            v_cod_camara;
     END IF;
+
+    UPDATE tb_atendimento
+       SET status = 'RESOLVIDO',
+           data_hora_resolucao = CURRENT_TIMESTAMP
+     WHERE id = NEW.cod_atendimento;
+
+    UPDATE tb_alerta
+       SET status = 'RESOLVIDO'
+     WHERE id = v_cod_alerta;
 
     RETURN NEW;
 END;
@@ -299,7 +304,7 @@ DECLARE
     v_temperatura_min DECIMAL(5,2);
     v_temperatura_max DECIMAL(5,2);
     v_gravidade VARCHAR(20);
-    v_vida_util DECIMAL(7,2);
+    v_vida_util INTERVAL;
     v_alerta INTEGER;
 BEGIN
     SELECT cam.id, cam.temperatura_min, cam.temperatura_max
@@ -350,6 +355,56 @@ AFTER INSERT ON tb_leitura_temperatura
 FOR EACH ROW EXECUTE FUNCTION fn_gerar_alerta_por_leitura();
 
 
+CREATE OR REPLACE FUNCTION fn_resolver_alerta_por_leitura_normal()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_camara INTEGER;
+    v_temperatura_min DECIMAL(5,2);
+    v_temperatura_max DECIMAL(5,2);
+BEGIN
+    SELECT cam.id, cam.temperatura_min, cam.temperatura_max
+      INTO v_camara, v_temperatura_min, v_temperatura_max
+      FROM tb_camara_frigorifica cam
+     WHERE cam.cod_termometro = NEW.cod_termometro;
+
+    IF v_camara IS NULL
+       OR NEW.temperatura < v_temperatura_min
+       OR NEW.temperatura > v_temperatura_max THEN
+        RETURN NEW;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+          FROM tb_leitura_temperatura posterior
+         WHERE posterior.cod_termometro = NEW.cod_termometro
+           AND (posterior.data_hora, posterior.id) > (NEW.data_hora, NEW.id)
+    ) THEN
+        RETURN NEW;
+    END IF;
+
+    UPDATE tb_atendimento atd
+       SET status = 'RESOLVIDO',
+           data_hora_resolucao = CURRENT_TIMESTAMP
+      FROM tb_alerta a
+     WHERE a.id = atd.cod_alerta
+       AND a.cod_camara_frigorifica = v_camara
+       AND a.status = 'ATIVO'
+       AND atd.status = 'PENDENTE';
+
+    UPDATE tb_alerta
+       SET status = 'RESOLVIDO'
+     WHERE cod_camara_frigorifica = v_camara
+       AND status = 'ATIVO';
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_resolver_alerta_por_leitura_normal
+AFTER INSERT ON tb_leitura_temperatura
+FOR EACH ROW EXECUTE FUNCTION fn_resolver_alerta_por_leitura_normal();
+
+
 CREATE OR REPLACE FUNCTION fn_impedir_alerta_aberto_camara()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -376,7 +431,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_impedir_alerta_aberto_camara();
 CREATE OR REPLACE FUNCTION fn_notificar_novo_alerta()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_horas_prazo DECIMAL(7,2);
+    v_horas_prazo INTERVAL;
 BEGIN
     v_horas_prazo := fn_calcular_prazo_escalonamento(NEW.id, 40);
 
@@ -386,7 +441,7 @@ BEGIN
             'id_alerta', NEW.id,
             'prazo_epoch',
             EXTRACT(EPOCH FROM (
-                NEW.data_hora + v_horas_prazo * INTERVAL '1 hour'
+                NEW.data_hora + v_horas_prazo
             ) AT TIME ZONE 'America/Sao_Paulo')
         )::text
     );

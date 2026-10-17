@@ -13,7 +13,6 @@ responder uma pergunta de negócio por meio de traversal.
 | `queries/queries.cypher` | Consultas de visualização e exploração do grafo. |
 | `queries/traversal.cypher` | Consultas de negócio que percorrem múltiplos relacionamentos. |
 | `diagramas/` | Capturas PNG das respostas exibidas no Aura. |
-| `.env.example` | Modelo das variáveis de conexão. |
 
 ## 1. Modelo de grafo
 
@@ -50,8 +49,7 @@ registros criados apenas para simulação.
 
 ## 3. Como executar
 
-1. Preencha `databases/neo4j/.env` com a URL do PostgreSQL e as credenciais do
-   Neo4j Aura.
+1. Preencha as variáveis `POSTGRES_*` e `NEO4J_*` no `.env` da raiz do repositório (copiado de `.env.example`).
 2. No Aura, execute cada comando de `setup.cypher` separadamente.
 3. Instale as dependências:
 
@@ -90,7 +88,6 @@ de vários relacionamentos e atende ao requisito de traversal.
 neo4j/
 ├── setup.cypher
 ├── load_graph.py
-├── .env.example
 ├── README.md
 ├── queries/
 │   ├── queries.cypher

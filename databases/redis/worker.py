@@ -14,6 +14,7 @@ import threading
 import time
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -21,7 +22,7 @@ import psycopg
 import redis
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 LOGGER = logging.getLogger("skadi.redis_worker")
 logging.basicConfig(
@@ -29,7 +30,14 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+POSTGRES_CONFIG = {
+    "host": os.environ["POSTGRES_HOST"],
+    "port": int(os.getenv("POSTGRES_PORT", "16590")),
+    "dbname": os.environ["POSTGRES_DB"],
+    "user": os.environ["POSTGRES_USER"],
+    "password": os.environ["POSTGRES_PASSWORD"],
+    "sslmode": os.getenv("POSTGRES_SSLMODE", "require"),
+}
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 WORKER_USER_ID = int(os.getenv("WORKER_USER_ID", "1"))
 TEMPERATURE_STREAM = os.getenv(
@@ -74,7 +82,7 @@ def parse_temperature(value: Any) -> Decimal:
 
 class PostgresRepository:
     def connect(self) -> psycopg.Connection:
-        connection = psycopg.connect(DATABASE_URL)
+        connection = psycopg.connect(**POSTGRES_CONFIG)
         connection.autocommit = True
         with connection.cursor() as cursor:
             cursor.execute(
@@ -97,7 +105,7 @@ class PostgresRepository:
                         SELECT 1
                         FROM tb_alerta a
                         WHERE a.cod_camara_frigorifica = cam.id
-                          AND a.status IN ('ativo', 'reconhecido')
+                          AND a.status IN ('ATIVO', 'RECONHECIDO')
                     ) AS possui_alerta_aberto
                 FROM tb_camara_frigorifica cam
                 WHERE cam.cod_termometro = %s
@@ -178,19 +186,17 @@ class PostgresRepository:
                         (
                             a.data_hora
                             + fn_calcular_prazo_escalonamento(a.id, 40)
-                              * INTERVAL '1 hour'
                         ) AT TIME ZONE 'America/Sao_Paulo'
                     )) AS prazo_40,
                     EXTRACT(EPOCH FROM (
                         (
                             a.data_hora
                             + fn_calcular_prazo_escalonamento(a.id, 70)
-                              * INTERVAL '1 hour'
                         ) AT TIME ZONE 'America/Sao_Paulo'
                     )) AS prazo_70
                 FROM tb_alerta a
                 WHERE a.id = %s
-                  AND a.status = 'ativo'
+                  AND a.status = 'ATIVO'
                 """,
                 (alert_id,),
             )
@@ -201,15 +207,15 @@ class PostgresRepository:
 
         level, deadline_40, deadline_70 = row
         deadlines: list[tuple[str, float]] = []
-        if level == "operador":
+        if level == "OPERADOR":
             deadlines.append((f"{alert_id}:40", float(deadline_40)))
-        if level in ("operador", "gestor"):
+        if level in ("OPERADOR", "GESTOR"):
             deadlines.append((f"{alert_id}:70", float(deadline_70)))
         return deadlines
 
     def active_alert_ids(self, connection: psycopg.Connection) -> list[int]:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT id FROM tb_alerta WHERE status = 'ativo'")
+            cursor.execute("SELECT id FROM tb_alerta WHERE status = 'ATIVO'")
             return [row[0] for row in cursor.fetchall()]
 
     def call_escalation_procedure(self, connection: psycopg.Connection) -> None:
