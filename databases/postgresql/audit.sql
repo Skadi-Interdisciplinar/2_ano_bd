@@ -1,9 +1,7 @@
 DROP VIEW IF EXISTS vw_dau_diario;
 DROP TABLE IF EXISTS tb_log_acesso;
 DROP TABLE IF EXISTS tb_log_auditoria;
-DROP TABLE IF EXISTS tb_log_acesso_relatorio;
 DROP TABLE IF EXISTS tb_log_escalonamento;
-DROP TABLE IF EXISTS tb_log_sensor;
 DROP TRIGGER IF EXISTS trg_auditoria_usuario ON tb_usuario;
 DROP TRIGGER IF EXISTS trg_auditoria_alerta ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_log_escalonamento ON tb_alerta;
@@ -40,19 +38,6 @@ CREATE TABLE tb_log_auditoria (
 	CONSTRAINT fk_log_auditoria_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id)
 );
 
-CREATE TABLE tb_log_acesso_relatorio (
-	id SERIAL,
-	cod_relatorio INTEGER NOT NULL,
-	cod_usuario INTEGER NOT NULL,
-	acao VARCHAR(20) NOT NULL,
-	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-	CONSTRAINT pk_log_acesso_relatorio PRIMARY KEY (id),
-	CONSTRAINT fk_log_acesso_relatorio_relatorio FOREIGN KEY (cod_relatorio) REFERENCES tb_relatorio(id),
-	CONSTRAINT fk_log_acesso_relatorio_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id),
-	CONSTRAINT ck_log_acesso_relatorio_acao CHECK (acao IN ('VISUALIZOU', 'BAIXOU'))
-);
-
 CREATE TABLE tb_log_escalonamento (
 	id SERIAL,
 	cod_alerta INTEGER NOT NULL,
@@ -64,18 +49,6 @@ CREATE TABLE tb_log_escalonamento (
 	CONSTRAINT pk_log_escalonamento PRIMARY KEY (id),
 	CONSTRAINT fk_log_escalonamento_alerta FOREIGN KEY (cod_alerta) REFERENCES tb_alerta(id)
 );
-
-CREATE TABLE tb_log_sensor (
-	id SERIAL,
-	cod_termometro INTEGER NOT NULL,
-	tipo_evento VARCHAR(50) NOT NULL,
-	detalhes TEXT NOT NULL,
-	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-	CONSTRAINT pk_log_sensor PRIMARY KEY (id),
-	CONSTRAINT fk_log_sensor_termometro FOREIGN KEY (cod_termometro) REFERENCES tb_termometro(id)
-);
-
 
 -- =============================================
 -- TRIGGERS DE AUDITORIA

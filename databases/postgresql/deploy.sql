@@ -1106,9 +1106,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_notificar_novo_alerta();
 DROP VIEW IF EXISTS vw_dau_diario;
 DROP TABLE IF EXISTS tb_log_acesso;
 DROP TABLE IF EXISTS tb_log_auditoria;
-DROP TABLE IF EXISTS tb_log_acesso_relatorio;
 DROP TABLE IF EXISTS tb_log_escalonamento;
-DROP TABLE IF EXISTS tb_log_sensor;
 DROP TRIGGER IF EXISTS trg_auditoria_usuario ON tb_usuario;
 DROP TRIGGER IF EXISTS trg_auditoria_alerta ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_log_escalonamento ON tb_alerta;
@@ -1145,19 +1143,6 @@ CREATE TABLE tb_log_auditoria (
 	CONSTRAINT fk_log_auditoria_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id)
 );
 
-CREATE TABLE tb_log_acesso_relatorio (
-	id SERIAL,
-	cod_relatorio INTEGER NOT NULL,
-	cod_usuario INTEGER NOT NULL,
-	acao VARCHAR(20) NOT NULL,
-	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-	CONSTRAINT pk_log_acesso_relatorio PRIMARY KEY (id),
-	CONSTRAINT fk_log_acesso_relatorio_relatorio FOREIGN KEY (cod_relatorio) REFERENCES tb_relatorio(id),
-	CONSTRAINT fk_log_acesso_relatorio_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id),
-	CONSTRAINT ck_log_acesso_relatorio_acao CHECK (acao IN ('VISUALIZOU', 'BAIXOU'))
-);
-
 CREATE TABLE tb_log_escalonamento (
 	id SERIAL,
 	cod_alerta INTEGER NOT NULL,
@@ -1169,18 +1154,6 @@ CREATE TABLE tb_log_escalonamento (
 	CONSTRAINT pk_log_escalonamento PRIMARY KEY (id),
 	CONSTRAINT fk_log_escalonamento_alerta FOREIGN KEY (cod_alerta) REFERENCES tb_alerta(id)
 );
-
-CREATE TABLE tb_log_sensor (
-	id SERIAL,
-	cod_termometro INTEGER NOT NULL,
-	tipo_evento VARCHAR(50) NOT NULL,
-	detalhes TEXT NOT NULL,
-	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-	CONSTRAINT pk_log_sensor PRIMARY KEY (id),
-	CONSTRAINT fk_log_sensor_termometro FOREIGN KEY (cod_termometro) REFERENCES tb_termometro(id)
-);
-
 
 -- =============================================
 -- TRIGGERS DE AUDITORIA
@@ -2040,19 +2013,6 @@ VALUES
 (3, 'Sistema ColdChain', 'CERT-2026-0002', 'ICP-Brasil', 'SHA256withRSA', 'CHAVE_PUBLICA_DE_TESTE_NAO_UTILIZAR', 'assinatura_simulada_relatorio_3', '2026-09-02 10:05:00');
 
 
--- =============================================
--- 13. LOG DE ACESSO A RELATÓRIOS
--- =============================================
-INSERT INTO tb_log_acesso_relatorio (
-    cod_relatorio, cod_usuario, acao
-)
-VALUES
-    (1, 32, 'VISUALIZOU'),
-    (1, 33, 'BAIXOU'),
-    (2, 33, 'VISUALIZOU'),
-    (3, 52, 'BAIXOU');
-
-
 -- Simulando escalonamento para gerar um log em tb_log_escalonamento
 UPDATE tb_alerta
 SET nivel_atual = 'GESTOR'
@@ -2066,20 +2026,7 @@ WHERE id = (
 
 
 -- =============================================
--- 14. LOG DE SENSORES
--- =============================================
-INSERT INTO tb_log_sensor (
-    cod_termometro, tipo_evento, detalhes
-)
-VALUES
-(1, 'MANUTENCAO', 'Sensor calibrado'),
-(2, 'FALHA', 'Leitura fora do comportamento esperado'),
-(7, 'MANUTENCAO', 'Sensor verificado'),
-(10, 'BATERIA', 'Bateria do sensor substituída');
-
-
--- =============================================
--- 15. LOG DE ACESSO
+-- 13. LOG DE ACESSO
 -- =============================================
 INSERT INTO tb_log_acesso (
     cod_usuario, tentativa_sucesso, ip_origem, user_agent, motivo_falha
@@ -2112,27 +2059,5 @@ SELECT
     END,
     CURRENT_TIMESTAMP - (gs * INTERVAL '4 hours')
 FROM generate_series(1, 100) AS gs;
-
--- Eventos de manutenção e telemetria distribuídos entre os termômetros cadastrados.
-INSERT INTO tb_log_sensor (
-    cod_termometro, tipo_evento, detalhes, data_hora
-)
-SELECT
-    ((gs - 1) % 50) + 1,
-    CASE gs % 4
-        WHEN 0 THEN 'MANUTENCAO'
-        WHEN 1 THEN 'BATERIA'
-        WHEN 2 THEN 'CALIBRACAO'
-        ELSE 'SINAL_INTERMITENTE'
-    END,
-    CASE gs % 4
-        WHEN 0 THEN 'Inspeção preventiva realizada no termômetro.'
-        WHEN 1 THEN 'Nível de bateria verificado durante a rotina de monitoramento.'
-        WHEN 2 THEN 'Calibração periódica registrada pela equipe técnica.'
-        ELSE 'Oscilação temporária de comunicação; sinal restabelecido.'
-    END,
-    CURRENT_TIMESTAMP - (gs * INTERVAL '3 hours')
-FROM generate_series(1, 100) AS gs;
-
 
 COMMIT;

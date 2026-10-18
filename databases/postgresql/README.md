@@ -59,7 +59,7 @@ deploy.sql
 
 ### Auditoria
 
-`tb_log_auditoria` · `tb_log_escalonamento` · `tb_log_acesso` · `tb_log_acesso_relatorio` · `tb_log_sensor`
+`tb_log_auditoria` · `tb_log_escalonamento` · `tb_log_acesso`
 
 ---
 
