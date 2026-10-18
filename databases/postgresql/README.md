@@ -27,19 +27,38 @@ Camada relacional do **Skadi**, responsável pelo armazenamento e gerenciamento 
 | `triggers.sql`                | Triggers das regras de negócio        |
 | `audit.sql`                   | Auditoria, escalonamento e logs       |
 | `dataload.sql`                | Massa de dados para testes de volume  |
-| `deploy.sql`                  | Execução completa do banco            |
+| `deploy.sql`                  | Criação da estrutura do banco         |
 
 ---
 
 ## Execução
 
-O `deploy.sql` é o ponto de entrada para a configuração do banco de dados PostgreSQL e executa os demais scripts necessários.
+O `deploy.sql` cria a estrutura do banco, incluindo tabelas e objetos do sistema. Ele não insere dados de teste.
 
-Para configurar o banco, execute:
+Para configurar o banco, execute `deploy.sql`. Para carregar os dados de teste, execute `dataload.sql` em seguida, uma única vez, em um banco recém-criado.
 
 ```text
 deploy.sql
+dataload.sql (opcional, depois do deploy)
 ```
+
+### Massa de dados
+
+O `dataload.sql` foi dimensionado para um banco recém-criado e carrega:
+
+* 27 estados e 20 CDs;
+* 175 endereços;
+* 50 termômetros e 50 câmaras, com vínculo individual;
+* 6 categorias;
+* 267 usuários: a conta técnica `skadi_worker`, 6 SUPER_ADMIN, 20 ADMINs, 40 GESTOREs e 200 OPERADORES;
+* 60 solicitações de suporte, todas inicialmente `REGISTRADO`;
+* 132 lotes e 132 vínculos com câmaras compatíveis;
+* 150 leituras: 100 normais e 50 fora da faixa. As triggers geram 50 alertas e 50 atendimentos. Para cada alerta, é criada uma notificação para cada operador do CD correspondente, totalizando 500 notificações;
+* 10 alertas reconhecidos, cinco deles resolvidos com justificativas após a normalização da temperatura; um alerta urgente também é escalonado para GESTOR;
+* 23 relatórios: um por CD e três adicionais; 15 assinaturas RSA de demonstração;
+* 605 eventos de acesso: cinco explícitos, 100 distribuídos em quatro horas e 500 distribuídos ao longo dos últimos dias.
+
+As contas de teste ADMIN, GESTOR, OPERADOR e `skadi_worker` usam a senha `senha123`; os seis SUPER_ADMIN informados usam `senha_temporaria`. As assinaturas RSA são de demonstração e não usam certificados ICP-Brasil. O `dataload.sql` não limpa registros existentes e deve ser executado uma única vez em banco recém-criado.
 
 ---
 
@@ -129,7 +148,7 @@ O trigger `trg_validar_temperatura_categoria_camara` impede que um lote seja col
 
 `tb_relatorio.conteudo` guarda o texto integral do relatório e `hash_conteudo` guarda seu hash SHA-256. `tb_assinatura.certificado_publico` guarda a chave pública em Base64 (DER/X.509) usada pela aplicação para verificar a assinatura.
 
-As assinaturas e chaves da massa em `dataload.sql` são placeholders e não passam pela verificação criptográfica da API.
+As chaves e assinaturas RSA da massa foram geradas para os relatórios de teste e podem ser usadas para testar a verificação criptográfica da API. Não são certificados ICP-Brasil.
 
 ### Escopo do usuário
 
