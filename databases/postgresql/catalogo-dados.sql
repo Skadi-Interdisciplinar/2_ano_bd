@@ -143,9 +143,13 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 -- tb_log_auditoria
 -- ==============================================
-('tb_log_auditoria', 'usuario_bd', 'VARCHAR(100)', TRUE, NULL, 'Login de conexão do Postgres (CURRENT_USER) que executou a ação', 'Diferente de cod_usuario: detecta alterações feitas fora da aplicação', 'ADMIN', FALSE),
-('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Estado da linha antes da alteração (OLD)', 'Preenchido apenas em UPDATE/DELETE; pode conter dados sensíveis das tabelas auditadas', 'ADMIN', TRUE),
-('tb_log_auditoria', 'dados_novos', 'JSONB', FALSE, NULL, 'Estado da linha depois da alteração (NEW)', 'Preenchido apenas em INSERT/UPDATE; pode conter dados sensíveis das tabelas auditadas', 'ADMIN', TRUE),
+('tb_log_auditoria', 'cod_usuario', 'INTEGER', FALSE, NULL, 'ID do usuário da aplicação associado à ação, quando informado', 'Pode ser NULL em operações sem contexto de usuário', 'ADMIN', FALSE),
+('tb_log_auditoria', 'acao', 'VARCHAR(150)', TRUE, NULL, 'Operação executada sobre a entidade', 'Recebe INSERT, UPDATE ou DELETE do trigger de auditoria', 'ADMIN', FALSE),
+('tb_log_auditoria', 'entidade_afetada', 'VARCHAR(50)', TRUE, NULL, 'Nome da tabela alterada', 'Identifica a entidade cujo histórico está sendo registrado', 'ADMIN', FALSE),
+('tb_log_auditoria', 'entidade_id', 'INTEGER', TRUE, NULL, 'ID da entidade alterada', 'As tabelas de negócio auditadas possuem chave primária id', 'ADMIN', FALSE),
+('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Estado da linha antes da alteração (OLD)', 'Preenchido apenas em UPDATE/DELETE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
+('tb_log_auditoria', 'dados_novos', 'JSONB', FALSE, NULL, 'Snapshot sanitizado da linha depois da operação', 'Preenchido em INSERT/UPDATE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
+('tb_log_auditoria', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento em que a operação foi registrada', 'Gerado pelo banco com CURRENT_TIMESTAMP', 'ADMIN', FALSE),
 
 -- ==============================================
 -- tb_log_escalonamento

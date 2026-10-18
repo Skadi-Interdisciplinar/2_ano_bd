@@ -1,5 +1,5 @@
 -- ====================================================================
--- DEPLOY: schemas.sql
+-- TABELAS
 -- ====================================================================
 
 DROP TABLE IF EXISTS tb_assinatura CASCADE;
@@ -294,7 +294,7 @@ CREATE TABLE tb_assinatura (
 
 
 -- ====================================================================
--- DEPLOY: functions.sql
+-- FUNÇÕES
 -- ====================================================================
 
 -- O tipo de retorno mudou de DECIMAL para INTERVAL; é necessário remover
@@ -431,7 +431,7 @@ $$ LANGUAGE plpgsql;
 
 
 -- ====================================================================
--- DEPLOY: procedures.sql
+-- PROCEDURES
 -- ====================================================================
 
 CREATE OR REPLACE PROCEDURE sp_reconhecer_alerta(
@@ -639,7 +639,7 @@ $$;
 
 
 -- ====================================================================
--- DEPLOY: triggers.sql
+-- TRIGGERS
 -- ====================================================================
 
 DROP TRIGGER IF EXISTS trg_criar_atendimento_pendente ON tb_alerta;
@@ -1100,17 +1100,13 @@ FOR EACH ROW EXECUTE FUNCTION fn_notificar_novo_alerta();
 
 
 -- ====================================================================
--- DEPLOY: audit.sql
+-- AUDITORIA
 -- ====================================================================
 
 DROP VIEW IF EXISTS vw_dau_diario;
 DROP TABLE IF EXISTS tb_log_acesso;
 DROP TABLE IF EXISTS tb_log_auditoria;
-DROP TABLE IF EXISTS tb_log_acesso_relatorio;
 DROP TABLE IF EXISTS tb_log_escalonamento;
-DROP TABLE IF EXISTS tb_log_sensor;
-DROP TRIGGER IF EXISTS trg_auditoria_usuario ON tb_usuario;
-DROP TRIGGER IF EXISTS trg_auditoria_alerta ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_log_escalonamento ON tb_alerta;
 
 
@@ -1132,8 +1128,7 @@ CREATE TABLE tb_log_acesso (
 
 CREATE TABLE tb_log_auditoria (
 	id SERIAL,
-	cod_usuario INTEGER NOT NULL,
-	usuario_bd VARCHAR(100) NOT NULL,
+	cod_usuario INTEGER,
 	acao VARCHAR(150) NOT NULL,
 	entidade_afetada VARCHAR(50) NOT NULL,
 	entidade_id INTEGER NOT NULL,
@@ -1141,21 +1136,7 @@ CREATE TABLE tb_log_auditoria (
 	dados_novos JSONB,
 	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-	CONSTRAINT pk_log_auditoria PRIMARY KEY (id),
-	CONSTRAINT fk_log_auditoria_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id)
-);
-
-CREATE TABLE tb_log_acesso_relatorio (
-	id SERIAL,
-	cod_relatorio INTEGER NOT NULL,
-	cod_usuario INTEGER NOT NULL,
-	acao VARCHAR(20) NOT NULL,
-	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-	CONSTRAINT pk_log_acesso_relatorio PRIMARY KEY (id),
-	CONSTRAINT fk_log_acesso_relatorio_relatorio FOREIGN KEY (cod_relatorio) REFERENCES tb_relatorio(id),
-	CONSTRAINT fk_log_acesso_relatorio_usuario FOREIGN KEY (cod_usuario) REFERENCES tb_usuario(id),
-	CONSTRAINT ck_log_acesso_relatorio_acao CHECK (acao IN ('VISUALIZOU', 'BAIXOU'))
+	CONSTRAINT pk_log_auditoria PRIMARY KEY (id)
 );
 
 CREATE TABLE tb_log_escalonamento (
@@ -1170,18 +1151,6 @@ CREATE TABLE tb_log_escalonamento (
 	CONSTRAINT fk_log_escalonamento_alerta FOREIGN KEY (cod_alerta) REFERENCES tb_alerta(id)
 );
 
-CREATE TABLE tb_log_sensor (
-	id SERIAL,
-	cod_termometro INTEGER NOT NULL,
-	tipo_evento VARCHAR(50) NOT NULL,
-	detalhes TEXT NOT NULL,
-	data_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-	CONSTRAINT pk_log_sensor PRIMARY KEY (id),
-	CONSTRAINT fk_log_sensor_termometro FOREIGN KEY (cod_termometro) REFERENCES tb_termometro(id)
-);
-
-
 -- =============================================
 -- TRIGGERS DE AUDITORIA
 -- =============================================
@@ -1189,22 +1158,44 @@ CREATE OR REPLACE FUNCTION fn_log_auditoria()
 RETURNS TRIGGER AS $$
 DECLARE
 	v_entidade_id INTEGER;
+	v_dados_antigos JSONB;
+	v_dados_novos JSONB;
+	v_campos_sensiveis TEXT[] := ARRAY[
+		'senha', 'cpf', 'email', 'hash_conteudo',
+		'conteudo', 'numero_serie', 'carimbo_tempo', 'ip_origem'
+	];
 BEGIN
 	IF TG_OP = 'DELETE' THEN
 		v_entidade_id := OLD.id;
+		v_dados_antigos := to_jsonb(OLD);
+	ELSIF TG_OP = 'UPDATE' THEN
+		v_entidade_id := NEW.id;
+		v_dados_antigos := to_jsonb(OLD);
+		v_dados_novos := to_jsonb(NEW);
 	ELSE
 		v_entidade_id := NEW.id;
+		v_dados_novos := to_jsonb(NEW);
 	END IF;
 
-	INSERT INTO tb_log_auditoria (cod_usuario, usuario_bd, acao, entidade_afetada, entidade_id, dados_antigos, dados_novos)
+	IF v_dados_antigos IS NOT NULL THEN
+		v_dados_antigos := v_dados_antigos - v_campos_sensiveis;
+	END IF;
+
+	IF v_dados_novos IS NOT NULL THEN
+		v_dados_novos := v_dados_novos - v_campos_sensiveis;
+	END IF;
+
+	INSERT INTO tb_log_auditoria (
+		cod_usuario, acao, entidade_afetada, entidade_id,
+		dados_antigos, dados_novos
+	)
 	VALUES (
-		current_setting('app.usuario_atual')::INTEGER,
-		CURRENT_USER,
+		NULLIF(current_setting('app.usuario_atual', TRUE), '')::INTEGER,
 		TG_OP,
 		TG_TABLE_NAME,
 		v_entidade_id,
-		CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD) ELSE NULL END,
-		CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW) ELSE NULL END
+		v_dados_antigos,
+		v_dados_novos
 	);
 
 	IF TG_OP = 'DELETE' THEN
@@ -1215,12 +1206,89 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Cadastros e estrutura dos CDs
+DROP TRIGGER IF EXISTS trg_auditoria_cd ON tb_cd;
+CREATE TRIGGER trg_auditoria_cd
+AFTER INSERT OR UPDATE OR DELETE ON tb_cd
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_endereco ON tb_endereco;
+CREATE TRIGGER trg_auditoria_endereco
+AFTER INSERT OR UPDATE OR DELETE ON tb_endereco
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_usuario ON tb_usuario;
 CREATE TRIGGER trg_auditoria_usuario
 AFTER INSERT OR UPDATE OR DELETE ON tb_usuario
 FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
 
+DROP TRIGGER IF EXISTS trg_auditoria_solicitacao_suporte ON tb_solicitacao_suporte;
+CREATE TRIGGER trg_auditoria_solicitacao_suporte
+AFTER INSERT OR UPDATE OR DELETE ON tb_solicitacao_suporte
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+-- Equipamentos, categorias, câmaras e lotes
+DROP TRIGGER IF EXISTS trg_auditoria_termometro ON tb_termometro;
+CREATE TRIGGER trg_auditoria_termometro
+AFTER INSERT OR UPDATE OR DELETE ON tb_termometro
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_categoria ON tb_categoria;
+CREATE TRIGGER trg_auditoria_categoria
+AFTER INSERT OR UPDATE OR DELETE ON tb_categoria
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_camara_frigorifica ON tb_camara_frigorifica;
+CREATE TRIGGER trg_auditoria_camara_frigorifica
+AFTER INSERT OR UPDATE OR DELETE ON tb_camara_frigorifica
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_lote ON tb_lote;
+CREATE TRIGGER trg_auditoria_lote
+AFTER INSERT OR UPDATE OR DELETE ON tb_lote
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_lote_camara_frigorifica ON tb_lote_camara_frigorifica;
+CREATE TRIGGER trg_auditoria_lote_camara_frigorifica
+AFTER INSERT OR UPDATE OR DELETE ON tb_lote_camara_frigorifica
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+-- Leituras, alertas e notificações
+DROP TRIGGER IF EXISTS trg_auditoria_alerta ON tb_alerta;
 CREATE TRIGGER trg_auditoria_alerta
 AFTER INSERT OR UPDATE OR DELETE ON tb_alerta
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_notificacao_alerta ON tb_notificacao_alerta;
+CREATE TRIGGER trg_auditoria_notificacao_alerta
+AFTER INSERT OR UPDATE OR DELETE ON tb_notificacao_alerta
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_leitura_temperatura ON tb_leitura_temperatura;
+CREATE TRIGGER trg_auditoria_leitura_temperatura
+AFTER INSERT OR UPDATE OR DELETE ON tb_leitura_temperatura
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+-- Atendimentos e justificativas
+DROP TRIGGER IF EXISTS trg_auditoria_atendimento ON tb_atendimento;
+CREATE TRIGGER trg_auditoria_atendimento
+AFTER INSERT OR UPDATE OR DELETE ON tb_atendimento
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_justificativa ON tb_justificativa;
+CREATE TRIGGER trg_auditoria_justificativa
+AFTER INSERT OR UPDATE OR DELETE ON tb_justificativa
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+-- Relatórios e assinaturas
+DROP TRIGGER IF EXISTS trg_auditoria_relatorio ON tb_relatorio;
+CREATE TRIGGER trg_auditoria_relatorio
+AFTER INSERT OR UPDATE OR DELETE ON tb_relatorio
+FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
+
+DROP TRIGGER IF EXISTS trg_auditoria_assinatura ON tb_assinatura;
+CREATE TRIGGER trg_auditoria_assinatura
+AFTER INSERT OR UPDATE OR DELETE ON tb_assinatura
 FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
 
 
@@ -1242,7 +1310,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_log_escalonamento();
 
 
 -- ====================================================================
--- DEPLOY: catalogo-dados.sql
+-- CATÁLOGO DE DADOS
 -- ====================================================================
 
 -- ====================================================================
@@ -1293,7 +1361,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- tb_usuario
 -- ==============================================
 ('tb_usuario', 'id', 'SERIAL', TRUE, 'PK', 'Identificador único do funcionário', NULL, 'OPERADOR', FALSE),
-('tb_usuario', 'username', 'VARCHAR(50)', TRUE, 'NK', 'Nome de usuário para autenticação', 'Único no sistema; usado no login da aplicação', 'ADMIN', TRUE),
+('tb_usuario', 'username', 'VARCHAR(50)', TRUE, 'NK', 'Nome de usuário para autenticação', 'Único no sistema; usado no login da aplicação e mantido nos snapshots de auditoria para identificar alterações', 'ADMIN', TRUE),
 ('tb_usuario', 'cpf', 'VARCHAR(11)', TRUE, 'NK', 'CPF do funcionário', 'Único no sistema; dado pessoal protegido por LGPD', 'ADMIN', TRUE),
 ('tb_usuario', 'email', 'VARCHAR(255)', TRUE, 'NK', 'E-mail do funcionário', 'Único no sistema; usado para login e notificações', 'ADMIN', TRUE),
 ('tb_usuario', 'senha', 'VARCHAR(255)', TRUE, NULL, 'Hash da senha de acesso', 'Nunca armazenada em texto plano; nunca exposta em relatórios ou exports', 'ADMIN', TRUE),
@@ -1390,9 +1458,13 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 -- tb_log_auditoria
 -- ==============================================
-('tb_log_auditoria', 'usuario_bd', 'VARCHAR(100)', TRUE, NULL, 'Login de conexão do Postgres (CURRENT_USER) que executou a ação', 'Diferente de cod_usuario: detecta alterações feitas fora da aplicação', 'ADMIN', FALSE),
-('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Estado da linha antes da alteração (OLD)', 'Preenchido apenas em UPDATE/DELETE; pode conter dados sensíveis das tabelas auditadas', 'ADMIN', TRUE),
-('tb_log_auditoria', 'dados_novos', 'JSONB', FALSE, NULL, 'Estado da linha depois da alteração (NEW)', 'Preenchido apenas em INSERT/UPDATE; pode conter dados sensíveis das tabelas auditadas', 'ADMIN', TRUE),
+('tb_log_auditoria', 'cod_usuario', 'INTEGER', FALSE, NULL, 'ID do usuário da aplicação associado à ação, quando informado', 'Pode ser NULL em operações sem contexto de usuário; não possui FK para preservar a referência histórica mesmo se o usuário for removido', 'ADMIN', FALSE),
+('tb_log_auditoria', 'acao', 'VARCHAR(150)', TRUE, NULL, 'Operação executada sobre a entidade', 'Recebe INSERT, UPDATE ou DELETE do trigger de auditoria', 'ADMIN', FALSE),
+('tb_log_auditoria', 'entidade_afetada', 'VARCHAR(50)', TRUE, NULL, 'Nome da tabela alterada', 'Identifica a entidade cujo histórico está sendo registrado', 'ADMIN', FALSE),
+('tb_log_auditoria', 'entidade_id', 'INTEGER', TRUE, NULL, 'ID da entidade alterada', 'As tabelas de negócio auditadas possuem chave primária id', 'ADMIN', FALSE),
+('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Snapshot sanitizado da linha antes da operação', 'Preenchido em UPDATE/DELETE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
+('tb_log_auditoria', 'dados_novos', 'JSONB', FALSE, NULL, 'Snapshot sanitizado da linha depois da operação', 'Preenchido em INSERT/UPDATE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
+('tb_log_auditoria', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento em que a operação foi registrada', 'Gerado pelo banco com CURRENT_TIMESTAMP', 'ADMIN', FALSE),
 
 -- ==============================================
 -- tb_log_escalonamento
@@ -1406,13 +1478,8 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 
 
 -- ====================================================================
--- DEPLOY: dau.sql
--- ====================================================================
-
--- ====================================================================
 -- MONITORAMENTO DAU (DAILY ACTIVE USERS)
 -- ====================================================================
-
 DROP VIEW IF EXISTS vw_dau_diario;
 
 -- Usuários únicos que realizaram pelo menos um acesso bem-sucedido por dia.
@@ -1428,13 +1495,8 @@ ORDER BY data_acesso;
 
 
 -- ====================================================================
--- DEPLOY: etl-transformacoes.sql
--- ====================================================================
-
--- ====================================================================
 -- TRANSFORMAÇÕES ETL: CTEs, WINDOW FUNCTIONS E CTE RECURSIVA
 -- ====================================================================
-
 WITH leituras_classificadas AS (
 	SELECT
 		lt.id AS cod_leitura,
@@ -1548,14 +1610,8 @@ ORDER BY cod_alerta, ordem_etapa;
 
 
 -- ====================================================================
--- DEPLOY: indices.sql
--- ====================================================================
-
--- ====================================================================
 -- ÍNDICES E CONSULTAS DE ANÁLISE DE DESEMPENHO
 -- ====================================================================
-
--- Remove os índices desta análise para reproduzir o cenário inicial.
 DROP INDEX IF EXISTS idx_leitura_termometro_data;
 DROP INDEX IF EXISTS idx_alerta_escalonamento;
 DROP INDEX IF EXISTS idx_lote_camara_ativos;
@@ -1648,10 +1704,6 @@ WHERE lc.cod_camara_frigorifica = 1
 
 
 -- ====================================================================
--- DEPLOY: roles.sql
--- ====================================================================
-
--- ====================================================================
 -- ROLES E USUÁRIOS DO POSTGRESQL
 -- ====================================================================
 
@@ -1739,400 +1791,3 @@ REVOKE EXECUTE ON PROCEDURE sp_reconhecer_alerta(INTEGER, INTEGER) FROM PUBLIC;
 REVOKE EXECUTE ON PROCEDURE sp_notificar_nivel_acesso(INTEGER, VARCHAR) FROM PUBLIC;
 REVOKE EXECUTE ON PROCEDURE sp_escalonar_alertas_pendentes() FROM PUBLIC;
 REVOKE EXECUTE ON PROCEDURE sp_cadastrar_usuario(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, INTEGER, INTEGER) FROM PUBLIC;
-
-
--- ====================================================================
--- DEPLOY: dataload.sql
--- ====================================================================
-
--- ====================================================================
--- MASSA DE DADOS PARA TESTE DE VOLUME
--- A carga possui mais de 500 registros distribuídos entre as tabelas.
--- ====================================================================
-BEGIN;
-
-
--- =============================================
--- 1. ESTADOS
--- =============================================
-INSERT INTO tb_estado (estado) VALUES
-('AC'), ('AL'), ('AP'), ('AM'), ('BA'), ('CE'), ('DF'), ('ES'), ('GO'),
-('MA'), ('MT'), ('MS'), ('MG'), ('PA'), ('PB'), ('PR'), ('PE'), ('PI'),
-('RJ'), ('RN'), ('RS'), ('RO'), ('RR'), ('SC'), ('SP'), ('SE'), ('TO');
-
-
--- =============================================
--- 2. CENTROS DE DISTRIBUIÇÃO
--- =============================================
-INSERT INTO tb_cd (nome, cnpj) VALUES
-('CD São Paulo', '48372615000194'),
-('CD Rio de Janeiro', '71940582000163'),
-('CD Minas Gerais', '90218437000128'),
-('CD Paraná', '35847126000179'),
-('CD Santa Catarina', '62490381000147');
-
-
--- =============================================
--- 3. ENDEREÇOS
--- =============================================
-INSERT INTO tb_endereco
-    (cep, rua, numero, cidade, bairro, complemento, cod_estado, cod_cd)
-SELECT
-    (10000000 + gs)::VARCHAR(8),
-    'Rua Industrial ' || gs,
-    100 + gs,
-
-    CASE ((gs - 1) % 5)
-        WHEN 0 THEN 'São Paulo'
-        WHEN 1 THEN 'Rio de Janeiro'
-        WHEN 2 THEN 'Belo Horizonte'
-        WHEN 3 THEN 'Curitiba'
-        ELSE 'Florianópolis'
-    END,
-
-    'Centro Industrial',
-
-    CASE
-        WHEN gs % 3 = 0 THEN 'Galpão ' || gs
-        ELSE NULL
-    END,
-
-    CASE ((gs - 1) % 5)
-        WHEN 0 THEN (SELECT id FROM tb_estado WHERE estado = 'SP')
-        WHEN 1 THEN (SELECT id FROM tb_estado WHERE estado = 'RJ')
-        WHEN 2 THEN (SELECT id FROM tb_estado WHERE estado = 'MG')
-        WHEN 3 THEN (SELECT id FROM tb_estado WHERE estado = 'PR')
-        ELSE (SELECT id FROM tb_estado WHERE estado = 'SC')
-    END,
-
-    ((gs - 1) % 5) + 1
-
-FROM generate_series(1, 100) AS gs;
-
-
--- =============================================
--- 4. USUÁRIOS
--- =============================================
-
-ALTER TABLE tb_usuario
-DISABLE TRIGGER trg_auditoria_usuario;
-
-INSERT INTO tb_usuario (
-    nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor
-)
-SELECT
-    (ARRAY[
-        'Ana', 'Bruno', 'Camila', 'Daniel', 'Eduarda',
-        'Felipe', 'Gabriela', 'Henrique', 'Isabela', 'João',
-        'Karina', 'Leonardo', 'Mariana', 'Nicolas', 'Olívia',
-        'Paulo', 'Rafaela', 'Samuel', 'Tatiana', 'Vinícius'
-    ])[((gs - 1) % 20) + 1]
-    || ' ' ||
-    (ARRAY[
-        'Almeida', 'Barbosa', 'Carvalho', 'Dias', 'Esteves'
-    ])[((gs - 1) / 20) + 1],
-    'colaborador' || LPAD(gs::TEXT, 3, '0'),
-    (10000000000 + (gs * 7919))::TEXT,
-    'colaborador' || LPAD(gs::TEXT, 3, '0') || '@skadi.com.br',
-    '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
-    CASE
-        WHEN gs <= 10 THEN 'ADMIN'
-        WHEN gs <= 30 THEN 'GESTOR'
-        ELSE 'OPERADOR'
-    END,
-    ((gs - 1) % 5) + 1,
-    CASE
-        WHEN gs > 30 THEN 11 + ((gs - 1) % 5)
-        ELSE NULL
-    END
-FROM generate_series(1, 100) AS gs
-ORDER BY gs;
-
-ALTER TABLE tb_usuario
-ENABLE TRIGGER trg_auditoria_usuario;
-
--- Define o usuário atual para as próximas auditorias.
-SELECT set_config('app.usuario_atual', '1', false);
-
--- Usuário administrador da plataforma, sem vínculo com CD ou gestor.
-INSERT INTO tb_usuario (
-    nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor
-)
-VALUES (
-    'Super ADM Skadi',
-    'mariproque',
-    NULL,
-    'marianaproque400@gmail.com',
-    '$2a$12$V/BiuqbeOeEWxbeUfBMgy..ESFzLoz0c4Z5zAy4ArSFuZksxXyNKC',
-    'SUPER_ADMIN',
-    NULL,
-    NULL
-);
-
-
--- =============================================
--- 5. TERMÔMETROS
--- =============================================
-INSERT INTO tb_termometro (modelo)
-SELECT
-	CASE
-		WHEN gs % 3 = 0 THEN 'ThermoTrack T-300'
-		WHEN gs % 3 = 1 THEN 'SensorTemp ST-200'
-		ELSE 'ColdMonitor CM-100'
-	END
-	|| '-' || LPAD(gs::TEXT, 3, '0')
-FROM generate_series(1, 50) AS gs;
-
-
--- =============================================
--- 6. CATEGORIAS
--- =============================================
-INSERT INTO tb_categoria
-    (nome, temperatura_min, temperatura_max, vida_util_horas)
-VALUES
-('Alcatra bovina resfriada', 3.00, 4.50, INTERVAL '240:00' HOUR TO MINUTE),
-('Contrafilé bovino resfriado', 2.00, 6.00, INTERVAL '216:00' HOUR TO MINUTE),
-('Lombo suíno resfriado', 3.00, 4.50, INTERVAL '168:00' HOUR TO MINUTE),
-('Peito de frango resfriado', 3.00, 4.50, INTERVAL '120:00' HOUR TO MINUTE),
-('Filé de tilápia fresco', -2.00, 2.00, INTERVAL '72:00' HOUR TO MINUTE),
-('Filé de salmão congelado', -22.00, -16.00, INTERVAL '720:00' HOUR TO MINUTE);
-
-
--- =============================================
--- 7. CÂMARAS FRIGORÍFICAS
--- =============================================
-INSERT INTO tb_camara_frigorifica
-    (modelo, localizacao, temperatura_min, temperatura_max, cod_cd, cod_termometro)
-VALUES
-
--- Câmaras frigoríficas de Carnes e Aves — 4°C
-('ColdStorage CS-500', 'Setor Carnes - Câmara 01', 3.00, 4.50, 1, 1),
-('ColdStorage CS-500', 'Setor Carnes - Câmara 02', 2.00, 6.00, 1, 2),
-('FrioMaster FM-400', 'Setor Carnes - Câmara 03', 2.00, 6.00, 2, 3),
-('FrioMaster FM-400', 'Setor Carnes - Câmara 04', 2.00, 6.00, 2, 4),
-('RefrigPro RP-300', 'Setor Carnes - Câmara 05', 2.00, 6.00, 3, 5),
-('RefrigPro RP-300', 'Setor Carnes - Câmara 06', 2.00, 6.00, 3, 6),
-
--- Câmaras frigoríficas de Pescados — 0°C
-('ColdStorage CS-500', 'Setor Pescados - Câmara 01', -2.00, 2.00, 4, 7),
-('FrioMaster FM-400', 'Setor Pescados - Câmara 02', -2.00, 2.00, 4, 8),
-('RefrigPro RP-300', 'Setor Pescados - Câmara 03', -2.00, 2.00, 5, 9),
-
--- Câmaras frigoríficas de Congelados — -18°C
-('ColdStorage CS-500', 'Setor Congelados - Câmara 01', -22.00, -16.00, 1, 10),
-('FrioMaster FM-400', 'Setor Congelados - Câmara 02', -22.00, -16.00, 2, 11),
-('RefrigPro RP-300', 'Setor Congelados - Câmara 03', -22.00, -16.00, 3, 12);
-
-
--- =============================================
--- 8. LOTES
--- =============================================
-INSERT INTO tb_lote
-    (codigo_lote, cod_categoria, data_fabricacao, data_validade)
-VALUES
-('LOTE-2026-0001', 1, '2026-08-20', '2026-09-08'),
-('LOTE-2026-0002', 2, '2026-08-21', '2026-09-09'),
-('LOTE-2026-0003', 3, '2026-08-22', '2026-09-07'),
-('LOTE-2026-0004', 4, '2026-08-23', '2026-09-06'),
-('LOTE-2026-0005', 1, '2026-08-20', '2026-09-08'),
-('LOTE-2026-0006', 2, '2026-08-21', '2026-09-09'),
-('LOTE-2026-0007', 5, '2026-08-25', '2026-09-05'),
-('LOTE-2026-0008', 5, '2026-08-26', '2026-09-06'),
-('LOTE-2026-0009', 5, '2026-08-27', '2026-09-07'),
-('LOTE-2026-0010', 6, '2026-08-01', '2027-08-01'),
-('LOTE-2026-0011', 6, '2026-08-02', '2027-08-02'),
-('LOTE-2026-0012', 6, '2026-08-03', '2027-08-03');
-
-INSERT INTO tb_lote_camara_frigorifica (cod_lote, cod_camara_frigorifica)
-VALUES
-    (1, 1),
-    (2, 2),
-    (3, 1),
-    (4, 1),
-    (5, 3),
-    (6, 4),
-    (7, 7),
-    (8, 8),
-    (9, 9),
-    (10, 10),
-    (11, 11),
-    (12, 12);
-
-
--- =============================================
--- 9. LEITURAS DE TEMPERATURA
--- =============================================
-
--- Leituras fora da faixa: cada uma gera um alerta via trigger.
-INSERT INTO tb_leitura_temperatura
-    (cod_termometro, temperatura, data_hora)
-VALUES
--- Câmara frigorífica 1 | Limite máximo: 4,5°C | Diferença: 0,30°C | Gravidade Baixa
-(1, 4.80, '2026-09-02 08:00:00'),
-
--- Câmara frigorífica 2 | Limite máximo: 6°C | Diferença: 0,80°C | Gravidade Baixa
-(2, 6.80, '2026-09-02 08:30:00'),
-
--- Câmara frigorífica 7 | Limite máximo: 2°C | Diferença: 3°C | Gravidade Atenção
-(7, 5.00, '2026-09-02 09:00:00'),
-
--- Câmara frigorífica 10 | Limite máximo: -16°C | Diferença: 8°C | Gravidade Crítica
-(10, -8.00, '2026-09-02 09:30:00');
-
--- =============================================
--- 10. RECONHECIMENTO DE ALERTA (exemplo)
--- =============================================
--- Reconhece o alerta da câmara frigorífica 1; a resolução automática
--- ocorre quando uma leitura posterior registrar temperatura dentro da faixa.
-DO $$
-DECLARE
-    v_cod_alerta INTEGER;
-BEGIN
-    SELECT id
-    INTO v_cod_alerta
-    FROM tb_alerta
-    WHERE cod_camara_frigorifica = 1
-    ORDER BY id DESC
-    LIMIT 1;
-
-    CALL sp_reconhecer_alerta(v_cod_alerta, 61);
-END $$;
-
--- Reconhece o alerta crítico do câmara frigorífica 10, sem resolver
-DO $$
-DECLARE
-    v_cod_alerta INTEGER;
-BEGIN
-    SELECT id
-    INTO v_cod_alerta
-    FROM tb_alerta
-    WHERE cod_camara_frigorifica = 10
-    ORDER BY id DESC
-    LIMIT 1;
-
-    CALL sp_reconhecer_alerta(v_cod_alerta, 41);
-END $$;
-
-
--- =============================================
--- 11. RELATÓRIOS
--- =============================================
-INSERT INTO tb_relatorio (
-    cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status, conteudo
-)
-VALUES
-(2, 'e59d3e70d8e55ce6fc36361645a3708294c6c4e5971a1ea0cf7844a4c7d6d862', '2026-08-01', '2026-08-31', 'GERADO', 'Relatorio operacional do periodo de agosto de 2026 - usuario 2.'),
-(3, '998be91f97fd94a6e41e184ece055dd2a3d30fa1a36beda81784fde6ce0d259c', '2026-08-01', '2026-08-31', 'ASSINADO', 'Relatorio operacional do periodo de agosto de 2026 - usuario 3.'),
-(4, '13c895e9b2a36953fe26ce97179eb2297eecfffa5a5205d0f2912cd6d41c0a9a', '2026-07-01', '2026-07-31', 'ARQUIVADO', 'Relatorio operacional do periodo de julho de 2026 - usuario 4.');
-
-
--- =============================================
--- 12. ASSINATURAS
--- =============================================
--- Chaves e assinaturas são placeholders de carga; não servem para validação criptográfica.
-INSERT INTO tb_assinatura (
-    cod_relatorio, certificado_titular, numero_serie,
-    autoridade_certificadora, algoritmo_assinatura, certificado_publico,
-    assinatura, carimbo_tempo
-)
-VALUES
-(2, 'Sistema ColdChain', 'CERT-2026-0001', 'ICP-Brasil', 'SHA256withRSA', 'CHAVE_PUBLICA_DE_TESTE_NAO_UTILIZAR', 'assinatura_simulada_relatorio_2', '2026-09-02 10:00:00'),
-(3, 'Sistema ColdChain', 'CERT-2026-0002', 'ICP-Brasil', 'SHA256withRSA', 'CHAVE_PUBLICA_DE_TESTE_NAO_UTILIZAR', 'assinatura_simulada_relatorio_3', '2026-09-02 10:05:00');
-
-
--- =============================================
--- 13. LOG DE ACESSO A RELATÓRIOS
--- =============================================
-INSERT INTO tb_log_acesso_relatorio (
-    cod_relatorio, cod_usuario, acao
-)
-VALUES
-    (1, 32, 'VISUALIZOU'),
-    (1, 33, 'BAIXOU'),
-    (2, 33, 'VISUALIZOU'),
-    (3, 52, 'BAIXOU');
-
-
--- Simulando escalonamento para gerar um log em tb_log_escalonamento
-UPDATE tb_alerta
-SET nivel_atual = 'GESTOR'
-WHERE id = (
-    SELECT id
-    FROM tb_alerta
-    WHERE nivel_gravidade = 'URGENTE'
-    ORDER BY id DESC
-    LIMIT 1
-);
-
-
--- =============================================
--- 14. LOG DE SENSORES
--- =============================================
-INSERT INTO tb_log_sensor (
-    cod_termometro, tipo_evento, detalhes
-)
-VALUES
-(1, 'MANUTENCAO', 'Sensor calibrado'),
-(2, 'FALHA', 'Leitura fora do comportamento esperado'),
-(7, 'MANUTENCAO', 'Sensor verificado'),
-(10, 'BATERIA', 'Bateria do sensor substituída');
-
-
--- =============================================
--- 15. LOG DE ACESSO
--- =============================================
-INSERT INTO tb_log_acesso (
-    cod_usuario, tentativa_sucesso, ip_origem, user_agent, motivo_falha
-)
-VALUES
-	(2, TRUE, '192.168.1.10', 'Mozilla/5.0', NULL),
-	(32, TRUE, '192.168.1.11', 'Mozilla/5.0', NULL),
-	(33, TRUE, '192.168.1.12', 'Mozilla/5.0', NULL),
-	(52, TRUE, '192.168.1.13', 'Mozilla/5.0', NULL),
-	(42, FALSE, '192.168.1.14', 'Mozilla/5.0', 'Senha incorreta');
-
--- Acessos distribuídos ao longo dos últimos dias para exercitar a view de DAU.
-INSERT INTO tb_log_acesso (
-    cod_usuario, tentativa_sucesso, ip_origem, user_agent,
-    motivo_falha, data_hora
-)
-SELECT
-    ((gs - 1) % 100) + 1,
-    gs % 8 <> 0,
-    ('10.10.0.' || gs)::INET,
-    CASE gs % 3
-        WHEN 0 THEN 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0'
-        WHEN 1 THEN 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/130.0'
-        ELSE 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1'
-    END,
-    CASE
-        WHEN gs % 8 <> 0 THEN NULL
-        WHEN gs % 2 = 0 THEN 'SENHA_INCORRETA'
-        ELSE 'USUARIO_INEXISTENTE'
-    END,
-    CURRENT_TIMESTAMP - (gs * INTERVAL '4 hours')
-FROM generate_series(1, 100) AS gs;
-
--- Eventos de manutenção e telemetria distribuídos entre os termômetros cadastrados.
-INSERT INTO tb_log_sensor (
-    cod_termometro, tipo_evento, detalhes, data_hora
-)
-SELECT
-    ((gs - 1) % 50) + 1,
-    CASE gs % 4
-        WHEN 0 THEN 'MANUTENCAO'
-        WHEN 1 THEN 'BATERIA'
-        WHEN 2 THEN 'CALIBRACAO'
-        ELSE 'SINAL_INTERMITENTE'
-    END,
-    CASE gs % 4
-        WHEN 0 THEN 'Inspeção preventiva realizada no termômetro.'
-        WHEN 1 THEN 'Nível de bateria verificado durante a rotina de monitoramento.'
-        WHEN 2 THEN 'Calibração periódica registrada pela equipe técnica.'
-        ELSE 'Oscilação temporária de comunicação; sinal restabelecido.'
-    END,
-    CURRENT_TIMESTAMP - (gs * INTERVAL '3 hours')
-FROM generate_series(1, 100) AS gs;
-
-
-COMMIT;
