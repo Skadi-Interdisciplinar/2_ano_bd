@@ -196,11 +196,13 @@ As vidas úteis de categorias e alertas são armazenadas como `INTERVAL HOUR TO 
 
 ## Auditoria
 
-Operações de `INSERT`, `UPDATE` e `DELETE` em `tb_usuario` e `tb_alerta` são registradas em `tb_log_auditoria`.
+Operações de `INSERT`, `UPDATE` e `DELETE` nas tabelas de negócio são registradas em `tb_log_auditoria`: CDs, endereços, usuários, solicitações de suporte, termômetros, categorias, câmaras, lotes, leituras, alertas, notificações, atendimentos, justificativas, relatórios e assinaturas. A tabela de referência `tb_estado`, o controle técnico de cargas RPA, os logs e o catálogo não são auditados.
 
-Alterações em `tb_alerta.nivel_atual` são registradas em `tb_log_escalonamento`.
+Cada registro guarda a operação, a tabela, o ID da entidade, o usuário da aplicação (`cod_usuario`, quando informado), o horário e snapshots anterior/novo conforme a operação.
 
-Dessa forma, o banco mantém o histórico das principais alterações relacionadas a usuários, alertas e escalonamentos.
+Os snapshots mantêm `username` para facilitar a identificação das alterações e omitem `cpf`, `email`, `senha`, `hash_conteudo`, `conteudo`, `numero_serie`, `carimbo_tempo` e `ip_origem`.
+
+Alterações em `tb_alerta.nivel_atual` continuam sendo registradas em `tb_log_escalonamento`, que mantém o nível anterior, o novo nível e o motivo do escalonamento.
 
 ---
 
