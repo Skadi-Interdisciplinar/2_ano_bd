@@ -117,6 +117,51 @@ CREATE TRIGGER trg_auditoria_usuario
 AFTER INSERT OR UPDATE OR DELETE ON tb_usuario
 FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
 
+CREATE OR REPLACE FUNCTION fn_log_admin_cd_auditoria()
+RETURNS TRIGGER AS $$
+DECLARE
+	v_cod_admin INTEGER;
+	v_dados_antigos JSONB;
+	v_dados_novos JSONB;
+BEGIN
+	IF TG_OP = 'DELETE' THEN
+		v_cod_admin := OLD.cod_admin;
+		v_dados_antigos := to_jsonb(OLD);
+	ELSIF TG_OP = 'UPDATE' THEN
+		v_cod_admin := NEW.cod_admin;
+		v_dados_antigos := to_jsonb(OLD);
+		v_dados_novos := to_jsonb(NEW);
+	ELSE
+		v_cod_admin := NEW.cod_admin;
+		v_dados_novos := to_jsonb(NEW);
+	END IF;
+
+	INSERT INTO tb_log_auditoria (
+		cod_usuario, acao, entidade_afetada, entidade_id,
+		dados_antigos, dados_novos
+	)
+	VALUES (
+		NULLIF(current_setting('app.usuario_atual', TRUE), '')::INTEGER,
+		TG_OP,
+		TG_TABLE_NAME,
+		v_cod_admin,
+		v_dados_antigos,
+		v_dados_novos
+	);
+
+	IF TG_OP = 'DELETE' THEN
+		RETURN OLD;
+	END IF;
+
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_auditoria_admin_cd ON tb_admin_cd;
+CREATE TRIGGER trg_auditoria_admin_cd
+AFTER INSERT OR UPDATE OR DELETE ON tb_admin_cd
+FOR EACH ROW EXECUTE FUNCTION fn_log_admin_cd_auditoria();
+
 DROP TRIGGER IF EXISTS trg_auditoria_solicitacao_suporte ON tb_solicitacao_suporte;
 CREATE TRIGGER trg_auditoria_solicitacao_suporte
 AFTER INSERT OR UPDATE OR DELETE ON tb_solicitacao_suporte

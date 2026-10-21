@@ -16,6 +16,7 @@ DROP TABLE IF EXISTS tb_lote CASCADE;
 DROP TABLE IF EXISTS tb_categoria CASCADE;
 DROP TABLE IF EXISTS tb_camara_frigorifica CASCADE;
 DROP TABLE IF EXISTS tb_termometro CASCADE;
+DROP TABLE IF EXISTS tb_admin_cd CASCADE;
 DROP TABLE IF EXISTS tb_usuario CASCADE;
 DROP TABLE IF EXISTS tb_endereco CASCADE;
 DROP TABLE IF EXISTS tb_cd CASCADE;
@@ -80,7 +81,20 @@ CREATE TABLE tb_usuario (
 	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
 		REFERENCES tb_usuario(id, cod_cd),
 	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
-	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('OPERADOR', 'GESTOR', 'ADMIN', 'SUPER_ADMIN'))
+	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('OPERADOR', 'GESTOR', 'ADMIN', 'SUPER_ADMIN')),
+	CONSTRAINT ck_usuario_cd_por_nivel CHECK (
+		(nivel_acesso IN ('ADMIN', 'SUPER_ADMIN') AND cod_cd IS NULL)
+		OR (nivel_acesso IN ('GESTOR', 'OPERADOR') AND cod_cd IS NOT NULL)
+	)
+);
+
+CREATE TABLE tb_admin_cd (
+	cod_admin INTEGER NOT NULL,
+	cod_cd INTEGER NOT NULL,
+
+	CONSTRAINT pk_admin_cd PRIMARY KEY (cod_admin, cod_cd),
+	CONSTRAINT fk_admin_cd_usuario FOREIGN KEY (cod_admin) REFERENCES tb_usuario(id) ON DELETE CASCADE,
+	CONSTRAINT fk_admin_cd_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id)
 );
 
 CREATE TABLE tb_solicitacao_suporte (
@@ -497,7 +511,16 @@ BEGIN
     JOIN tb_camara_frigorifica c
         ON c.id = a.cod_camara_frigorifica
     JOIN tb_usuario u
-        ON u.cod_cd = c.cod_cd AND u.nivel_acesso = p_nivel
+        ON u.nivel_acesso = p_nivel
+       AND (
+            (p_nivel = 'ADMIN' AND EXISTS (
+                SELECT 1
+                FROM tb_admin_cd admin_cd
+                WHERE admin_cd.cod_admin = u.id
+                  AND admin_cd.cod_cd = c.cod_cd
+            ))
+            OR (p_nivel IN ('OPERADOR', 'GESTOR') AND u.cod_cd = c.cod_cd)
+       )
     WHERE a.id = p_cod_alerta;
 END;
 $$;
@@ -554,8 +577,8 @@ AS $$
 DECLARE
     v_cod_executor INTEGER;
     v_nivel_executor VARCHAR(11);
-    v_cd_executor INTEGER;
     v_usuario_atual TEXT;
+    v_novo_usuario INTEGER;
 BEGIN
     v_usuario_atual := current_setting('app.usuario_atual', true);
 
@@ -569,8 +592,8 @@ BEGIN
         RAISE EXCEPTION 'app.usuario_atual deve conter um ID inteiro.';
     END;
 
-    SELECT u.nivel_acesso, u.cod_cd
-    INTO v_nivel_executor, v_cd_executor
+    SELECT u.nivel_acesso
+    INTO v_nivel_executor
     FROM tb_usuario u
     WHERE u.id = v_cod_executor;
 
@@ -592,7 +615,7 @@ BEGIN
     ELSIF p_cpf IS NULL THEN
         RAISE EXCEPTION
             'O CPF do novo usuário é obrigatório.';
-    ELSIF p_cod_cd IS NULL THEN
+    ELSIF p_nivel_acesso IN ('GESTOR', 'OPERADOR') AND p_cod_cd IS NULL THEN
         RAISE EXCEPTION 'O CD do novo usuário é obrigatório.';
     END IF;
 
@@ -615,8 +638,13 @@ BEGIN
 
     -- ADM cadastra Gestor e Operador apenas no próprio CD.
     ELSIF v_nivel_executor = 'ADMIN' THEN
-        IF v_cd_executor IS DISTINCT FROM p_cod_cd THEN
-            RAISE EXCEPTION 'O administrador só pode cadastrar usuários do próprio CD.';
+        IF NOT EXISTS (
+            SELECT 1
+            FROM tb_admin_cd
+            WHERE cod_admin = v_cod_executor
+              AND cod_cd = p_cod_cd
+        ) THEN
+            RAISE EXCEPTION 'O administrador só pode cadastrar usuários dos CDs vinculados a ele.';
         END IF;
 
         IF p_nivel_acesso NOT IN ('GESTOR', 'OPERADOR') THEN
@@ -632,8 +660,15 @@ BEGIN
         nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor
     ) VALUES (
         p_nome, p_username, p_cpf, p_email, p_senha,
-        p_nivel_acesso, p_cod_cd, p_cod_gestor
-    );
+        p_nivel_acesso,
+        CASE WHEN p_nivel_acesso = 'ADMIN' THEN NULL ELSE p_cod_cd END,
+        p_cod_gestor
+    ) RETURNING id INTO v_novo_usuario;
+
+    IF p_nivel_acesso = 'ADMIN' AND p_cod_cd IS NOT NULL THEN
+        INSERT INTO tb_admin_cd (cod_admin, cod_cd)
+        VALUES (v_novo_usuario, p_cod_cd);
+    END IF;
 END;
 $$;
 
@@ -650,21 +685,17 @@ DROP TRIGGER IF EXISTS trg_resolver_alerta_por_leitura_normal ON tb_leitura_temp
 DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_impedir_alerta_aberto_camara ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_validar_gestor_usuario ON tb_usuario;
+DROP TRIGGER IF EXISTS trg_validar_admin_cd ON tb_admin_cd;
 DROP TRIGGER IF EXISTS trg_validar_solicitacao_suporte ON tb_solicitacao_suporte;
 
 CREATE OR REPLACE FUNCTION fn_validar_gestor_usuario()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Super ADM administra a plataforma e não possui CPF, CD ou gestor.
+    -- SUPER_ADMIN não pertence a um CD; ADMIN usa tb_admin_cd.
     IF NEW.nivel_acesso = 'SUPER_ADMIN' THEN
         IF NEW.cpf IS NOT NULL THEN
             RAISE EXCEPTION
                 'Usuário super_admin não pode possuir CPF.';
-        END IF;
-
-        IF NEW.cod_cd IS NOT NULL THEN
-            RAISE EXCEPTION
-                'Usuário super_admin não pode estar vinculado a um CD.';
         END IF;
 
         IF NEW.cod_gestor IS NOT NULL THEN
@@ -675,16 +706,10 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- ADM, Gestor e Operador devem possuir CPF e CD.
+    -- Usuários de CD devem possuir CPF.
     IF NEW.cpf IS NULL THEN
         RAISE EXCEPTION
             'Usuário com nível % deve possuir CPF.',
-            NEW.nivel_acesso;
-    END IF;
-
-    IF NEW.cod_cd IS NULL THEN
-        RAISE EXCEPTION
-            'Usuário com nível % deve estar vinculado a um CD.',
             NEW.nivel_acesso;
     END IF;
 
@@ -732,6 +757,15 @@ BEGIN
             OLD.id;
     END IF;
 
+    IF TG_OP = 'UPDATE'
+       AND OLD.nivel_acesso = 'ADMIN'
+       AND NEW.nivel_acesso <> 'ADMIN'
+       AND EXISTS (SELECT 1 FROM tb_admin_cd WHERE cod_admin = OLD.id) THEN
+        RAISE EXCEPTION
+            'O ADMIN % não pode mudar de nível enquanto possuir CDs vinculados.',
+            OLD.id;
+    END IF;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -742,6 +776,29 @@ ON tb_usuario
 FOR EACH ROW
 EXECUTE FUNCTION fn_validar_gestor_usuario();
 
+CREATE OR REPLACE FUNCTION fn_validar_admin_cd()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM tb_usuario
+        WHERE id = NEW.cod_admin
+          AND nivel_acesso = 'ADMIN'
+          AND cod_cd IS NULL
+    ) THEN
+        RAISE EXCEPTION
+            'O usuário % precisa ser ADMIN sem CD direto para receber um vínculo em tb_admin_cd.',
+            NEW.cod_admin;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_admin_cd
+BEFORE INSERT OR UPDATE OF cod_admin, cod_cd ON tb_admin_cd
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_admin_cd();
 
 CREATE OR REPLACE FUNCTION fn_validar_solicitacao_suporte()
 RETURNS TRIGGER AS $$
@@ -1222,6 +1279,51 @@ CREATE TRIGGER trg_auditoria_usuario
 AFTER INSERT OR UPDATE OR DELETE ON tb_usuario
 FOR EACH ROW EXECUTE FUNCTION fn_log_auditoria();
 
+CREATE OR REPLACE FUNCTION fn_log_admin_cd_auditoria()
+RETURNS TRIGGER AS $$
+DECLARE
+	v_cod_admin INTEGER;
+	v_dados_antigos JSONB;
+	v_dados_novos JSONB;
+BEGIN
+	IF TG_OP = 'DELETE' THEN
+		v_cod_admin := OLD.cod_admin;
+		v_dados_antigos := to_jsonb(OLD);
+	ELSIF TG_OP = 'UPDATE' THEN
+		v_cod_admin := NEW.cod_admin;
+		v_dados_antigos := to_jsonb(OLD);
+		v_dados_novos := to_jsonb(NEW);
+	ELSE
+		v_cod_admin := NEW.cod_admin;
+		v_dados_novos := to_jsonb(NEW);
+	END IF;
+
+	INSERT INTO tb_log_auditoria (
+		cod_usuario, acao, entidade_afetada, entidade_id,
+		dados_antigos, dados_novos
+	)
+	VALUES (
+		NULLIF(current_setting('app.usuario_atual', TRUE), '')::INTEGER,
+		TG_OP,
+		TG_TABLE_NAME,
+		v_cod_admin,
+		v_dados_antigos,
+		v_dados_novos
+	);
+
+	IF TG_OP = 'DELETE' THEN
+		RETURN OLD;
+	END IF;
+
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_auditoria_admin_cd ON tb_admin_cd;
+CREATE TRIGGER trg_auditoria_admin_cd
+AFTER INSERT OR UPDATE OR DELETE ON tb_admin_cd
+FOR EACH ROW EXECUTE FUNCTION fn_log_admin_cd_auditoria();
+
 DROP TRIGGER IF EXISTS trg_auditoria_solicitacao_suporte ON tb_solicitacao_suporte;
 CREATE TRIGGER trg_auditoria_solicitacao_suporte
 AFTER INSERT OR UPDATE OR DELETE ON tb_solicitacao_suporte
@@ -1366,8 +1468,14 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_usuario', 'email', 'VARCHAR(255)', TRUE, 'NK', 'E-mail do funcionário', 'Único no sistema; usado para login e notificações', 'ADMIN', TRUE),
 ('tb_usuario', 'senha', 'VARCHAR(255)', TRUE, NULL, 'Hash da senha de acesso', 'Nunca armazenada em texto plano; nunca exposta em relatórios ou exports', 'ADMIN', TRUE),
 ('tb_usuario', 'nivel_acesso', 'VARCHAR(11)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: OPERADOR, GESTOR, ADMIN e SUPER_ADMIN; acessos técnicos ao banco são controlados por roles PostgreSQL', 'GESTOR', FALSE),
-('tb_usuario', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o funcionário pertence', 'Referencia tb_cd(id)', 'OPERADOR', FALSE),
+('tb_usuario', 'cod_cd', 'INTEGER', FALSE, 'FK', 'Centro de distribuição direto do funcionário', 'Obrigatório para GESTOR e OPERADOR; deve ser NULL para ADMIN e SUPER_ADMIN. CDs do ADMIN são mantidos em tb_admin_cd', 'OPERADOR', FALSE),
 ('tb_usuario', 'cod_gestor', 'INTEGER', FALSE, 'FK', 'Gestor responsável pelo funcionário', 'Opcional; deve referenciar um usuário com nível gestor e do mesmo CD', 'GESTOR', FALSE),
+
+-- ==============================================
+-- tb_admin_cd
+-- ==============================================
+('tb_admin_cd', 'cod_admin', 'INTEGER', TRUE, 'PK', 'Administrador associado ao CD', 'Deve referenciar um usuário ADMIN; compõe a chave primária com cod_cd', 'ADMIN', FALSE),
+('tb_admin_cd', 'cod_cd', 'INTEGER', TRUE, 'PK', 'Centro de distribuição administrado', 'Um ADMIN pode ser associado a vários CDs; cada par admin/CD é único', 'ADMIN', FALSE),
 
 -- ==============================================
 -- tb_categoria
@@ -1461,7 +1569,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_log_auditoria', 'cod_usuario', 'INTEGER', FALSE, NULL, 'ID do usuário da aplicação associado à ação, quando informado', 'Pode ser NULL em operações sem contexto de usuário; não possui FK para preservar a referência histórica mesmo se o usuário for removido', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'acao', 'VARCHAR(150)', TRUE, NULL, 'Operação executada sobre a entidade', 'Recebe INSERT, UPDATE ou DELETE do trigger de auditoria', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'entidade_afetada', 'VARCHAR(50)', TRUE, NULL, 'Nome da tabela alterada', 'Identifica a entidade cujo histórico está sendo registrado', 'ADMIN', FALSE),
-('tb_log_auditoria', 'entidade_id', 'INTEGER', TRUE, NULL, 'ID da entidade alterada', 'As tabelas de negócio auditadas possuem chave primária id', 'ADMIN', FALSE),
+('tb_log_auditoria', 'entidade_id', 'INTEGER', TRUE, NULL, 'Referência numérica da entidade alterada', 'Em tb_admin_cd contém cod_admin; o par cod_admin/cod_cd fica nos snapshots, pois a chave é composta', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Snapshot sanitizado da linha antes da operação', 'Preenchido em UPDATE/DELETE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'dados_novos', 'JSONB', FALSE, NULL, 'Snapshot sanitizado da linha depois da operação', 'Preenchido em INSERT/UPDATE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento em que a operação foi registrada', 'Gerado pelo banco com CURRENT_TIMESTAMP', 'ADMIN', FALSE),
@@ -1752,6 +1860,7 @@ TO sys_database_admin;
 -- 5. WORKER
 GRANT USAGE ON SCHEMA public TO skadi_worker;
 GRANT SELECT ON
+    tb_admin_cd,
     tb_camara_frigorifica,
     tb_lote_camara_frigorifica,
     tb_lote,

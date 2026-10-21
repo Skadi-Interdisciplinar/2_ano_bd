@@ -122,9 +122,22 @@ SELECT
     LPAD((20000000000 + cd.id)::TEXT, 11, '0'),
     'admin.cd' || LPAD(cd.id::TEXT, 2, '0') || '@skadi.example',
     '$2a$12$HZ7dYoDeadUb.jpyhXV63uEH2PN525cWcV0dNEt5I3J1uuFQ02Sge',
-    'ADMIN', cd.id, NULL
+    'ADMIN', NULL, NULL
 FROM tb_cd cd
 ORDER BY cd.id;
+
+INSERT INTO tb_admin_cd (cod_admin, cod_cd)
+SELECT admin.id, cd.id
+FROM tb_cd cd
+JOIN tb_usuario admin
+    ON admin.username = 'admin' || LPAD(cd.id::TEXT, 3, '0')
+UNION
+SELECT admin.id, outro_cd.id
+FROM tb_cd cd
+JOIN tb_usuario admin
+    ON admin.username = 'admin' || LPAD(cd.id::TEXT, 3, '0')
+JOIN tb_cd outro_cd
+    ON outro_cd.id = CASE WHEN cd.id = (SELECT MAX(id) FROM tb_cd) THEN 1 ELSE cd.id + 1 END;
 
 INSERT INTO tb_usuario
     (nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor)
@@ -442,8 +455,10 @@ SELECT
         ELSE 'GERADO'
     END
 FROM tb_cd cd
+JOIN tb_admin_cd admin_cd
+    ON admin_cd.cod_cd = cd.id
 JOIN tb_usuario admin
-    ON admin.cod_cd = cd.id
+    ON admin.id = admin_cd.cod_admin
    AND admin.username = 'admin' || LPAD(cd.id::TEXT, 3, '0')
 JOIN (VALUES
         (1, '6043ddebb2d117e47604510a29612a73c3af24122fbc0d8ae458e6f89f27361c'),

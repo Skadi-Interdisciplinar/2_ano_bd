@@ -6,21 +6,16 @@ DROP TRIGGER IF EXISTS trg_resolver_alerta_por_leitura_normal ON tb_leitura_temp
 DROP TRIGGER IF EXISTS trg_notificar_novo_alerta ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_impedir_alerta_aberto_camara ON tb_alerta;
 DROP TRIGGER IF EXISTS trg_validar_gestor_usuario ON tb_usuario;
+DROP TRIGGER IF EXISTS trg_validar_admin_cd ON tb_admin_cd;
 DROP TRIGGER IF EXISTS trg_validar_solicitacao_suporte ON tb_solicitacao_suporte;
 
 CREATE OR REPLACE FUNCTION fn_validar_gestor_usuario()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Super ADM administra a plataforma e não possui CPF, CD ou gestor.
     IF NEW.nivel_acesso = 'SUPER_ADMIN' THEN
         IF NEW.cpf IS NOT NULL THEN
             RAISE EXCEPTION
                 'Usuário super_admin não pode possuir CPF.';
-        END IF;
-
-        IF NEW.cod_cd IS NOT NULL THEN
-            RAISE EXCEPTION
-                'Usuário super_admin não pode estar vinculado a um CD.';
         END IF;
 
         IF NEW.cod_gestor IS NOT NULL THEN
@@ -31,16 +26,10 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- ADM, Gestor e Operador devem possuir CPF e CD.
+    -- Usuários de CD devem possuir CPF.
     IF NEW.cpf IS NULL THEN
         RAISE EXCEPTION
             'Usuário com nível % deve possuir CPF.',
-            NEW.nivel_acesso;
-    END IF;
-
-    IF NEW.cod_cd IS NULL THEN
-        RAISE EXCEPTION
-            'Usuário com nível % deve estar vinculado a um CD.',
             NEW.nivel_acesso;
     END IF;
 
@@ -88,6 +77,15 @@ BEGIN
             OLD.id;
     END IF;
 
+    IF TG_OP = 'UPDATE'
+       AND OLD.nivel_acesso = 'ADMIN'
+       AND NEW.nivel_acesso <> 'ADMIN'
+       AND EXISTS (SELECT 1 FROM tb_admin_cd WHERE cod_admin = OLD.id) THEN
+        RAISE EXCEPTION
+            'O ADMIN % não pode mudar de nível enquanto possuir CDs vinculados.',
+            OLD.id;
+    END IF;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -98,6 +96,29 @@ ON tb_usuario
 FOR EACH ROW
 EXECUTE FUNCTION fn_validar_gestor_usuario();
 
+CREATE OR REPLACE FUNCTION fn_validar_admin_cd()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM tb_usuario
+        WHERE id = NEW.cod_admin
+          AND nivel_acesso = 'ADMIN'
+          AND cod_cd IS NULL
+    ) THEN
+        RAISE EXCEPTION
+            'O usuário % precisa ser ADMIN sem CD direto para receber um vínculo em tb_admin_cd.',
+            NEW.cod_admin;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_admin_cd
+BEFORE INSERT OR UPDATE OF cod_admin, cod_cd ON tb_admin_cd
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_admin_cd();
 
 CREATE OR REPLACE FUNCTION fn_validar_solicitacao_suporte()
 RETURNS TRIGGER AS $$
