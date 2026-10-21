@@ -47,6 +47,7 @@ TO sys_database_admin;
 -- 5. WORKER
 GRANT USAGE ON SCHEMA public TO skadi_worker;
 GRANT SELECT ON
+    tb_admin_cd,
     tb_camara_frigorifica,
     tb_lote_camara_frigorifica,
     tb_lote,

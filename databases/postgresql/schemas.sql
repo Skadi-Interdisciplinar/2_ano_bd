@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS tb_lote CASCADE;
 DROP TABLE IF EXISTS tb_categoria CASCADE;
 DROP TABLE IF EXISTS tb_camara_frigorifica CASCADE;
 DROP TABLE IF EXISTS tb_termometro CASCADE;
+DROP TABLE IF EXISTS tb_admin_cd CASCADE;
 DROP TABLE IF EXISTS tb_usuario CASCADE;
 DROP TABLE IF EXISTS tb_endereco CASCADE;
 DROP TABLE IF EXISTS tb_cd CASCADE;
@@ -76,7 +77,20 @@ CREATE TABLE tb_usuario (
 	CONSTRAINT fk_usuario_gestor_mesmo_cd FOREIGN KEY (cod_gestor, cod_cd)
 		REFERENCES tb_usuario(id, cod_cd),
 	CONSTRAINT ck_usuario_nao_eh_proprio_gestor CHECK (cod_gestor IS NULL OR cod_gestor <> id),
-	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('OPERADOR', 'GESTOR', 'ADMIN', 'SUPER_ADMIN'))
+	CONSTRAINT ck_usuario_nivel_acesso CHECK (nivel_acesso IN ('OPERADOR', 'GESTOR', 'ADMIN', 'SUPER_ADMIN')),
+	CONSTRAINT ck_usuario_cd_por_nivel CHECK (
+		(nivel_acesso IN ('ADMIN', 'SUPER_ADMIN') AND cod_cd IS NULL)
+		OR (nivel_acesso IN ('GESTOR', 'OPERADOR') AND cod_cd IS NOT NULL)
+	)
+);
+
+CREATE TABLE tb_admin_cd (
+	cod_admin INTEGER NOT NULL,
+	cod_cd INTEGER NOT NULL,
+
+	CONSTRAINT pk_admin_cd PRIMARY KEY (cod_admin, cod_cd),
+	CONSTRAINT fk_admin_cd_usuario FOREIGN KEY (cod_admin) REFERENCES tb_usuario(id) ON DELETE CASCADE,
+	CONSTRAINT fk_admin_cd_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id)
 );
 
 CREATE TABLE tb_solicitacao_suporte (

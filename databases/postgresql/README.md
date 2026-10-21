@@ -50,7 +50,7 @@ O `dataload.sql` foi dimensionado para um banco recém-criado e carrega:
 * 175 endereços;
 * 50 termômetros e 50 câmaras, com vínculo individual;
 * 6 categorias;
-* 267 usuários: a conta técnica `skadi_worker`, 6 SUPER_ADMIN, 20 ADMINs, 40 GESTOREs e 200 OPERADORES;
+* 267 usuários: a conta técnica `skadi_worker`, 6 SUPER_ADMIN, 20 ADMINs, 40 GESTOREs e 200 OPERADORES; `tb_admin_cd` contém 40 vínculos, com dois CDs por ADMIN;
 * 60 solicitações de suporte, todas inicialmente `REGISTRADO`;
 * 132 lotes e 132 vínculos com câmaras compatíveis;
 * 150 leituras: 100 normais e 50 fora da faixa. As triggers geram 50 alertas e 50 atendimentos. Para cada alerta, é criada uma notificação para cada operador do CD correspondente, totalizando 500 notificações;
@@ -66,7 +66,9 @@ As contas de teste ADMIN, GESTOR, OPERADOR e `skadi_worker` usam a senha `senha1
 
 ### Cadastro
 
-`tb_estado` · `tb_cd` · `tb_endereco` · `tb_usuario` · `tb_termometro` · `tb_categoria` · `tb_camara_frigorifica` · `tb_lote` · `tb_lote_camara_frigorifica`
+`tb_estado` · `tb_cd` · `tb_endereco` · `tb_usuario` · `tb_admin_cd` · `tb_termometro` · `tb_categoria` · `tb_camara_frigorifica` · `tb_lote` · `tb_lote_camara_frigorifica`
+
+`tb_admin_cd` relaciona ADMINs e CDs. O campo `tb_usuario.cod_cd` fica nulo para ADMIN e SUPER_ADMIN; GESTOR e OPERADOR precisam ter um CD direto.
 
 ### Monitoramento e alertas
 
@@ -215,7 +217,7 @@ As vidas úteis de categorias e alertas são armazenadas como `INTERVAL HOUR TO 
 
 ## Auditoria
 
-Operações de `INSERT`, `UPDATE` e `DELETE` nas tabelas de negócio são registradas em `tb_log_auditoria`: CDs, endereços, usuários, solicitações de suporte, termômetros, categorias, câmaras, lotes, leituras, alertas, notificações, atendimentos, justificativas, relatórios e assinaturas. A tabela de referência `tb_estado`, o controle técnico de cargas RPA, os logs e o catálogo não são auditados.
+Operações de `INSERT`, `UPDATE` e `DELETE` nas tabelas de negócio são registradas em `tb_log_auditoria`: CDs, endereços, usuários, vínculos ADMIN–CD, solicitações de suporte, termômetros, categorias, câmaras, lotes, leituras, alertas, notificações, atendimentos, justificativas, relatórios e assinaturas. A tabela de referência `tb_estado`, o controle técnico de cargas RPA, os logs e o catálogo não são auditados.
 
 Cada registro guarda a operação, a tabela, o ID da entidade, o usuário da aplicação (`cod_usuario`, quando informado), o horário e snapshots anterior/novo conforme a operação.
 
