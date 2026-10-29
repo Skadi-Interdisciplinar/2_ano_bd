@@ -61,7 +61,16 @@ BEGIN
     JOIN tb_camara_frigorifica c
         ON c.id = a.cod_camara_frigorifica
     JOIN tb_usuario u
-        ON u.cod_cd = c.cod_cd AND u.nivel_acesso = p_nivel
+        ON u.nivel_acesso = p_nivel
+       AND (
+            (p_nivel = 'ADMIN' AND EXISTS (
+                SELECT 1
+                FROM tb_admin_cd admin_cd
+                WHERE admin_cd.cod_admin = u.id
+                  AND admin_cd.cod_cd = c.cod_cd
+            ))
+            OR (p_nivel IN ('OPERADOR', 'GESTOR') AND u.cod_cd = c.cod_cd)
+       )
     WHERE a.id = p_cod_alerta;
 END;
 $$;
@@ -118,8 +127,8 @@ AS $$
 DECLARE
     v_cod_executor INTEGER;
     v_nivel_executor VARCHAR(11);
-    v_cd_executor INTEGER;
     v_usuario_atual TEXT;
+    v_novo_usuario INTEGER;
 BEGIN
     v_usuario_atual := current_setting('app.usuario_atual', true);
 
@@ -133,8 +142,8 @@ BEGIN
         RAISE EXCEPTION 'app.usuario_atual deve conter um ID inteiro.';
     END;
 
-    SELECT u.nivel_acesso, u.cod_cd
-    INTO v_nivel_executor, v_cd_executor
+    SELECT u.nivel_acesso
+    INTO v_nivel_executor
     FROM tb_usuario u
     WHERE u.id = v_cod_executor;
 
@@ -156,7 +165,7 @@ BEGIN
     ELSIF p_cpf IS NULL THEN
         RAISE EXCEPTION
             'O CPF do novo usuário é obrigatório.';
-    ELSIF p_cod_cd IS NULL THEN
+    ELSIF p_nivel_acesso IN ('GESTOR', 'OPERADOR') AND p_cod_cd IS NULL THEN
         RAISE EXCEPTION 'O CD do novo usuário é obrigatório.';
     END IF;
 
@@ -177,10 +186,15 @@ BEGIN
                 'Super ADM pode cadastrar somente super_administradores ou administradores.';
         END IF;
 
-    -- ADM cadastra Gestor e Operador apenas no próprio CD.
+    -- ADMIN cadastra Gestor e Operador apenas nos CDs vinculados a ele.
     ELSIF v_nivel_executor = 'ADMIN' THEN
-        IF v_cd_executor IS DISTINCT FROM p_cod_cd THEN
-            RAISE EXCEPTION 'O administrador só pode cadastrar usuários do próprio CD.';
+        IF NOT EXISTS (
+            SELECT 1
+            FROM tb_admin_cd
+            WHERE cod_admin = v_cod_executor
+              AND cod_cd = p_cod_cd
+        ) THEN
+            RAISE EXCEPTION 'O administrador só pode cadastrar usuários dos CDs vinculados a ele.';
         END IF;
 
         IF p_nivel_acesso NOT IN ('GESTOR', 'OPERADOR') THEN
@@ -196,7 +210,14 @@ BEGIN
         nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor
     ) VALUES (
         p_nome, p_username, p_cpf, p_email, p_senha,
-        p_nivel_acesso, p_cod_cd, p_cod_gestor
-    );
+        p_nivel_acesso,
+        CASE WHEN p_nivel_acesso = 'ADMIN' THEN NULL ELSE p_cod_cd END,
+        p_cod_gestor
+    ) RETURNING id INTO v_novo_usuario;
+
+    IF p_nivel_acesso = 'ADMIN' AND p_cod_cd IS NOT NULL THEN
+        INSERT INTO tb_admin_cd (cod_admin, cod_cd)
+        VALUES (v_novo_usuario, p_cod_cd);
+    END IF;
 END;
 $$;

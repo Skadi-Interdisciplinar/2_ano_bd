@@ -122,9 +122,22 @@ SELECT
     LPAD((20000000000 + cd.id)::TEXT, 11, '0'),
     'admin.cd' || LPAD(cd.id::TEXT, 2, '0') || '@skadi.example',
     '$2a$12$HZ7dYoDeadUb.jpyhXV63uEH2PN525cWcV0dNEt5I3J1uuFQ02Sge',
-    'ADMIN', cd.id, NULL
+    'ADMIN', NULL, NULL
 FROM tb_cd cd
 ORDER BY cd.id;
+
+INSERT INTO tb_admin_cd (cod_admin, cod_cd)
+SELECT admin.id, cd.id
+FROM tb_cd cd
+JOIN tb_usuario admin
+    ON admin.username = 'admin' || LPAD(cd.id::TEXT, 3, '0')
+UNION
+SELECT admin.id, outro_cd.id
+FROM tb_cd cd
+JOIN tb_usuario admin
+    ON admin.username = 'admin' || LPAD(cd.id::TEXT, 3, '0')
+JOIN tb_cd outro_cd
+    ON outro_cd.id = CASE WHEN cd.id = (SELECT MAX(id) FROM tb_cd) THEN 1 ELSE cd.id + 1 END;
 
 INSERT INTO tb_usuario
     (nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor)
@@ -429,9 +442,10 @@ ORDER BY cam.id;
 -- 11. RELATÓRIOS
 -- =============================
 INSERT INTO tb_relatorio
-    (cod_usuario_gerador, hash_conteudo, conteudo, periodo_inicio, periodo_fim, status)
+    (cod_usuario_gerador, cod_cd, hash_conteudo, conteudo, periodo_inicio, periodo_fim, status)
 SELECT
     admin.id,
+    cd.id,
     hashes.hash_conteudo,
     'Relatório operacional do ' || cd.nome || ' referente a outubro de 2026.',
     DATE '2026-10-01',
@@ -442,8 +456,10 @@ SELECT
         ELSE 'GERADO'
     END
 FROM tb_cd cd
+JOIN tb_admin_cd admin_cd
+    ON admin_cd.cod_cd = cd.id
 JOIN tb_usuario admin
-    ON admin.cod_cd = cd.id
+    ON admin.id = admin_cd.cod_admin
    AND admin.username = 'admin' || LPAD(cd.id::TEXT, 3, '0')
 JOIN (VALUES
         (1, '6043ddebb2d117e47604510a29612a73c3af24122fbc0d8ae458e6f89f27361c'),
@@ -472,18 +488,18 @@ ORDER BY cd.id;
 
 -- Assinaturas RSA de demonstração
 INSERT INTO tb_relatorio (
-    cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status, conteudo
+    cod_usuario_gerador, cod_cd, hash_conteudo, periodo_inicio, periodo_fim, status, conteudo
 )
 VALUES
-((SELECT id FROM tb_usuario WHERE username = 'admin001'),
+((SELECT id FROM tb_usuario WHERE username = 'admin001'), 1,
  'e59d3e70d8e55ce6fc36361645a3708294c6c4e5971a1ea0cf7844a4c7d6d862',
  '2026-08-01', '2026-08-31', 'GERADO',
  'Relatorio operacional do periodo de agosto de 2026 - usuario 2.'),
-((SELECT id FROM tb_usuario WHERE username = 'admin002'),
+((SELECT id FROM tb_usuario WHERE username = 'admin002'), 2,
  '998be91f97fd94a6e41e184ece055dd2a3d30fa1a36beda81784fde6ce0d259c',
  '2026-08-01', '2026-08-31', 'ASSINADO',
  'Relatorio operacional do periodo de agosto de 2026 - usuario 3.'),
-((SELECT id FROM tb_usuario WHERE username = 'admin003'),
+((SELECT id FROM tb_usuario WHERE username = 'admin003'), 3,
  '13c895e9b2a36953fe26ce97179eb2297eecfffa5a5205d0f2912cd6d41c0a9a',
  '2026-07-01', '2026-07-31', 'ARQUIVADO',
  'Relatorio operacional do periodo de julho de 2026 - usuario 4.');

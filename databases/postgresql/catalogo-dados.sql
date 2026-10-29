@@ -51,8 +51,14 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_usuario', 'email', 'VARCHAR(255)', TRUE, 'NK', 'E-mail do funcionário', 'Único no sistema; usado para login e notificações', 'ADMIN', TRUE),
 ('tb_usuario', 'senha', 'VARCHAR(255)', TRUE, NULL, 'Hash da senha de acesso', 'Nunca armazenada em texto plano; nunca exposta em relatórios ou exports', 'ADMIN', TRUE),
 ('tb_usuario', 'nivel_acesso', 'VARCHAR(11)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: OPERADOR, GESTOR, ADMIN e SUPER_ADMIN; acessos técnicos ao banco são controlados por roles PostgreSQL', 'GESTOR', FALSE),
-('tb_usuario', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o funcionário pertence', 'Referencia tb_cd(id)', 'OPERADOR', FALSE),
+('tb_usuario', 'cod_cd', 'INTEGER', FALSE, 'FK', 'Centro de distribuição direto do funcionário', 'Obrigatório para GESTOR e OPERADOR; deve ser NULL para ADMIN e SUPER_ADMIN. CDs do ADMIN são mantidos em tb_admin_cd', 'OPERADOR', FALSE),
 ('tb_usuario', 'cod_gestor', 'INTEGER', FALSE, 'FK', 'Gestor responsável pelo funcionário', 'Opcional; deve referenciar um usuário com nível gestor e do mesmo CD', 'GESTOR', FALSE),
+
+-- ==============================================
+-- tb_admin_cd
+-- ==============================================
+('tb_admin_cd', 'cod_admin', 'INTEGER', TRUE, 'PK', 'Administrador associado ao CD', 'Deve referenciar um usuário ADMIN; compõe a chave primária com cod_cd', 'ADMIN', FALSE),
+('tb_admin_cd', 'cod_cd', 'INTEGER', TRUE, 'PK', 'Centro de distribuição administrado', 'Um ADMIN pode ser associado a vários CDs; cada par admin/CD é único', 'ADMIN', FALSE),
 
 -- ==============================================
 -- tb_categoria
@@ -127,6 +133,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 -- tb_relatorio
 -- ==============================================
+('tb_relatorio', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o relatório pertence', 'Permite escopo por CD, inclusive quando o ADMIN autor administra vários CDs', 'ADMIN', FALSE),
 ('tb_relatorio', 'hash_conteudo', 'VARCHAR(64)', TRUE, NULL, 'Hash SHA-256 do conteúdo do relatório', 'Garante integridade: qualquer alteração no conteúdo altera o hash, evidenciando adulteração', 'ADMIN', TRUE),
 ('tb_relatorio', 'conteudo', 'TEXT', TRUE, NULL, 'Conteúdo integral do relatório', 'Armazena o relatório cujo hash SHA-256 é mantido em hash_conteudo', 'GESTOR', TRUE),
 ('tb_relatorio', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do relatório', 'GERADO -> ASSINADO -> ARQUIVADO', 'GESTOR', FALSE),
@@ -146,7 +153,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_log_auditoria', 'cod_usuario', 'INTEGER', FALSE, NULL, 'ID do usuário da aplicação associado à ação, quando informado', 'Pode ser NULL em operações sem contexto de usuário', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'acao', 'VARCHAR(150)', TRUE, NULL, 'Operação executada sobre a entidade', 'Recebe INSERT, UPDATE ou DELETE do trigger de auditoria', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'entidade_afetada', 'VARCHAR(50)', TRUE, NULL, 'Nome da tabela alterada', 'Identifica a entidade cujo histórico está sendo registrado', 'ADMIN', FALSE),
-('tb_log_auditoria', 'entidade_id', 'INTEGER', TRUE, NULL, 'ID da entidade alterada', 'As tabelas de negócio auditadas possuem chave primária id', 'ADMIN', FALSE),
+('tb_log_auditoria', 'entidade_id', 'INTEGER', TRUE, NULL, 'Referência numérica da entidade alterada', 'Em tb_admin_cd contém cod_admin; o par cod_admin/cod_cd fica nos snapshots, pois a chave é composta', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Estado da linha antes da alteração (OLD)', 'Preenchido apenas em UPDATE/DELETE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'dados_novos', 'JSONB', FALSE, NULL, 'Snapshot sanitizado da linha depois da operação', 'Preenchido em INSERT/UPDATE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento em que a operação foi registrada', 'Gerado pelo banco com CURRENT_TIMESTAMP', 'ADMIN', FALSE),
