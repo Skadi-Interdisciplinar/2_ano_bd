@@ -68,7 +68,7 @@ As contas de teste ADMIN, GESTOR, OPERADOR e `skadi_worker` usam a senha `senha1
 
 `tb_estado` · `tb_cd` · `tb_endereco` · `tb_usuario` · `tb_admin_cd` · `tb_termometro` · `tb_categoria` · `tb_camara_frigorifica` · `tb_lote` · `tb_lote_camara_frigorifica`
 
-`tb_admin_cd` relaciona ADMINs e CDs. O campo `tb_usuario.cod_cd` fica nulo para ADMIN e SUPER_ADMIN; GESTOR e OPERADOR precisam ter um CD direto.
+`tb_admin_cd` relaciona ADMINs e CDs. O campo `tb_usuario.cod_cd` fica nulo para ADMIN e SUPER_ADMIN; GESTOR e OPERADOR precisam ter um CD direto. Cada relatório também guarda `cod_cd` próprio, pois o ADMIN que o gera pode administrar vários centros.
 
 ### Monitoramento e alertas
 

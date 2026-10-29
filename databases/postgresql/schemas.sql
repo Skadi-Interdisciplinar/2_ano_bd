@@ -273,6 +273,7 @@ CREATE TABLE tb_justificativa (
 CREATE TABLE tb_relatorio (
 	id SERIAL,
 	cod_usuario_gerador INTEGER NOT NULL,
+	cod_cd INTEGER NOT NULL,
 	data_hora_geracao TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	hash_conteudo VARCHAR(64) NOT NULL,
 	conteudo TEXT NOT NULL,
@@ -282,6 +283,7 @@ CREATE TABLE tb_relatorio (
 
 	CONSTRAINT pk_relatorio PRIMARY KEY (id),
 	CONSTRAINT fk_relatorio_usuario FOREIGN KEY (cod_usuario_gerador) REFERENCES tb_usuario(id),
+	CONSTRAINT fk_relatorio_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id),
 	CONSTRAINT ck_relatorio_periodo CHECK (periodo_fim >= periodo_inicio),
 	CONSTRAINT ck_relatorio_status CHECK (status IN ('GERADO', 'ASSINADO', 'ARQUIVADO'))
 );

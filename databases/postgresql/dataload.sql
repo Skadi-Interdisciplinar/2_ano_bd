@@ -442,9 +442,10 @@ ORDER BY cam.id;
 -- 11. RELATÓRIOS
 -- =============================
 INSERT INTO tb_relatorio
-    (cod_usuario_gerador, hash_conteudo, conteudo, periodo_inicio, periodo_fim, status)
+    (cod_usuario_gerador, cod_cd, hash_conteudo, conteudo, periodo_inicio, periodo_fim, status)
 SELECT
     admin.id,
+    cd.id,
     hashes.hash_conteudo,
     'Relatório operacional do ' || cd.nome || ' referente a outubro de 2026.',
     DATE '2026-10-01',
@@ -487,18 +488,18 @@ ORDER BY cd.id;
 
 -- Assinaturas RSA de demonstração
 INSERT INTO tb_relatorio (
-    cod_usuario_gerador, hash_conteudo, periodo_inicio, periodo_fim, status, conteudo
+    cod_usuario_gerador, cod_cd, hash_conteudo, periodo_inicio, periodo_fim, status, conteudo
 )
 VALUES
-((SELECT id FROM tb_usuario WHERE username = 'admin001'),
+((SELECT id FROM tb_usuario WHERE username = 'admin001'), 1,
  'e59d3e70d8e55ce6fc36361645a3708294c6c4e5971a1ea0cf7844a4c7d6d862',
  '2026-08-01', '2026-08-31', 'GERADO',
  'Relatorio operacional do periodo de agosto de 2026 - usuario 2.'),
-((SELECT id FROM tb_usuario WHERE username = 'admin002'),
+((SELECT id FROM tb_usuario WHERE username = 'admin002'), 2,
  '998be91f97fd94a6e41e184ece055dd2a3d30fa1a36beda81784fde6ce0d259c',
  '2026-08-01', '2026-08-31', 'ASSINADO',
  'Relatorio operacional do periodo de agosto de 2026 - usuario 3.'),
-((SELECT id FROM tb_usuario WHERE username = 'admin003'),
+((SELECT id FROM tb_usuario WHERE username = 'admin003'), 3,
  '13c895e9b2a36953fe26ce97179eb2297eecfffa5a5205d0f2912cd6d41c0a9a',
  '2026-07-01', '2026-07-31', 'ARQUIVADO',
  'Relatorio operacional do periodo de julho de 2026 - usuario 4.');

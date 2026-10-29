@@ -277,6 +277,7 @@ CREATE TABLE tb_justificativa (
 CREATE TABLE tb_relatorio (
 	id SERIAL,
 	cod_usuario_gerador INTEGER NOT NULL,
+	cod_cd INTEGER NOT NULL,
 	data_hora_geracao TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	hash_conteudo VARCHAR(64) NOT NULL,
 	conteudo TEXT NOT NULL,
@@ -286,6 +287,7 @@ CREATE TABLE tb_relatorio (
 
 	CONSTRAINT pk_relatorio PRIMARY KEY (id),
 	CONSTRAINT fk_relatorio_usuario FOREIGN KEY (cod_usuario_gerador) REFERENCES tb_usuario(id),
+	CONSTRAINT fk_relatorio_cd FOREIGN KEY (cod_cd) REFERENCES tb_cd(id),
 	CONSTRAINT ck_relatorio_periodo CHECK (periodo_fim >= periodo_inicio),
 	CONSTRAINT ck_relatorio_status CHECK (status IN ('GERADO', 'ASSINADO', 'ARQUIVADO'))
 );
@@ -1550,6 +1552,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 -- tb_relatorio
 -- ==============================================
+('tb_relatorio', 'cod_cd', 'INTEGER', TRUE, 'FK', 'Centro de distribuição ao qual o relatório pertence', 'Permite escopo por CD, inclusive quando o ADMIN autor administra vários CDs', 'ADMIN', FALSE),
 ('tb_relatorio', 'hash_conteudo', 'VARCHAR(64)', TRUE, NULL, 'Hash SHA-256 do conteúdo do relatório', 'Garante integridade: qualquer alteração no conteúdo altera o hash, evidenciando adulteração', 'ADMIN', TRUE),
 ('tb_relatorio', 'conteudo', 'TEXT', TRUE, NULL, 'Conteúdo integral do relatório', 'Armazena o relatório cujo hash SHA-256 é mantido em hash_conteudo', 'GESTOR', TRUE),
 ('tb_relatorio', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do relatório', 'GERADO -> ASSINADO -> ARQUIVADO', 'GESTOR', FALSE),
