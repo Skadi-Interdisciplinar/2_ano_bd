@@ -28,6 +28,9 @@ Camada relacional do **Skadi**, responsável pelo armazenamento e gerenciamento 
 | `audit.sql`                   | Auditoria, escalonamento e logs       |
 | `dataload.sql`                | Massa de dados para testes de volume  |
 | `deploy.sql`                  | Criação da estrutura do banco         |
+| `data-mart.sql`               | Views dimensionais para BI (alertas e chamados) |
+| `data-mart.md`                | Grãos, dimensões, métricas e validação do Data Mart |
+| `backup-recuperacao.md`       | Procedimentos de backup lógico e recuperação de falhas |
 
 ---
 
@@ -39,8 +42,13 @@ Para configurar o banco, execute `deploy.sql`. Para carregar os dados de teste, 
 
 ```text
 deploy.sql
+data-mart.sql (camada analítica, após o deploy)
 dataload.sql (opcional, depois do deploy)
 ```
+
+A camada analítica está descrita em [data-mart.md](data-mart.md). Em banco existente, execute apenas `data-mart.sql` para adicionar as views; não reexecute o deploy destrutivo.
+
+Os procedimentos de backup e recuperação de falhas estão em [backup-recuperacao.md](backup-recuperacao.md).
 
 ### Massa de dados
 
