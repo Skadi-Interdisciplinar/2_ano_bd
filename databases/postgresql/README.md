@@ -59,7 +59,7 @@ O `dataload.sql` foi dimensionado para um banco recém-criado e carrega:
 * 50 termômetros e 50 câmaras, com vínculo individual;
 * 6 categorias;
 * 267 usuários: a conta técnica `skadi_worker`, 6 SUPER_ADMIN, 20 ADMINs, 40 GESTOREs e 200 OPERADORES; `tb_admin_cd` contém 40 vínculos, com dois CDs por ADMIN;
-* 60 solicitações de suporte, todas inicialmente `REGISTRADO`;
+* 60 solicitações de suporte: 20 `REGISTRADO`, 20 `EM_ATENDIMENTO` e 20 `ATENDIDO`, distribuídas nas quatro categorias e nos últimos 20 dias. Os chamados em atendimento e atendidos possuem responsáveis SUPER_ADMIN; os atendidos possuem resposta e encerramento, com tempos variados para os gráficos. As mudanças respeitam as transições das triggers;
 * 132 lotes e 132 vínculos com câmaras compatíveis;
 * 150 leituras: 100 normais e 50 fora da faixa. As triggers geram 50 alertas e 50 atendimentos. Para cada alerta, é criada uma notificação para cada operador do CD correspondente, totalizando 500 notificações;
 * 10 alertas reconhecidos, cinco deles resolvidos com justificativas após a normalização da temperatura; um alerta CRITICO também é escalonado para GESTOR;
