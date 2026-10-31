@@ -41,10 +41,9 @@ absoluta entre a temperatura atual e a temperatura ideal.
 
 | Diferença absoluta | Gravidade armazenada |
 | --- | --- |
-| até 1 °C | `baixa` |
-| até 3 °C | `atenção` |
-| até 5 °C | `urgente` |
-| acima de 5 °C | `crítica` |
+| até 1 °C | `BAIXO` |
+| até 3 °C | `ATENCAO` |
+| acima de 3 °C | `CRITICO` |
 
 ## Integração entre bancos
 
