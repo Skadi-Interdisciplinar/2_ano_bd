@@ -10,7 +10,7 @@ import argparse
 import logging
 import os
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import psycopg
 from psycopg.rows import dict_row
@@ -44,6 +44,28 @@ def obter_configuracao(nome: str) -> str:
     return valor
 
 
+def normalizar_nivel_acesso(valor: str) -> str:
+    nivel = str(valor).strip().upper()
+    if nivel not in {"OPERADOR", "GESTOR", "ADMIN", "SUPER_ADMIN"}:
+        raise ValueError(f"Nível de acesso inválido no legado: {valor!r}.")
+    return nivel
+
+
+def normalizar_status_lote(valor: str) -> str:
+    status = str(valor).strip().upper()
+    if status not in {"ATIVO", "BLOQUEADO", "EXPEDIDO", "VENDIDO"}:
+        raise ValueError(f"Status de lote inválido no legado: {valor!r}.")
+    return status
+
+
+def normalizar_vida_util(valor: object) -> timedelta:
+    """Converte horas numéricas ou INTERVAL do legado para timedelta."""
+
+    if isinstance(valor, timedelta):
+        return valor
+    return timedelta(hours=float(valor))
+
+
 def obter_ultima_execucao(
     conexao: psycopg.Connection,
     nome_carga: str,
@@ -66,12 +88,16 @@ def buscar_delta(
     consulta: str,
     ultima_execucao: datetime | None,
     limite_execucao: datetime,
+    *,
+    alias_tabela: str | None = None,
 ) -> list[dict]:
-    filtros = "data_atualizacao <= %s"
+    # O alias é definido pelas consultas internas, nunca por entrada externa.
+    coluna = f"{alias_tabela}.data_atualizacao" if alias_tabela else "data_atualizacao"
+    filtros = f"{coluna} <= %s"
     parametros: list[datetime] = [limite_execucao]
 
     if ultima_execucao is not None:
-        filtros = "data_atualizacao > %s AND " + filtros
+        filtros = f"{coluna} > %s AND " + filtros
         parametros.insert(0, ultima_execucao)
 
     with conexao.cursor(row_factory=dict_row) as cursor:
@@ -199,15 +225,10 @@ def carregar_enderecos(
 
 
 def validar_usuario(registro: dict) -> None:
-    niveis_validos = {"operador", "gestor", "admin", "super_admin"}
-    nivel = registro["nivel_acesso"]
+    nivel = normalizar_nivel_acesso(registro["nivel_acesso"])
+    registro["nivel_acesso"] = nivel
 
-    if nivel not in niveis_validos:
-        raise ValueError(
-            f"Usuário legado {registro['id_usuario']} possui nível inválido: {nivel!r}."
-        )
-
-    if nivel == "super_admin":
+    if nivel == "SUPER_ADMIN":
         if any(
             registro[campo] is not None
             for campo in ("cpf", "id_cd", "cod_gestor")
@@ -224,14 +245,16 @@ def validar_usuario(registro: dict) -> None:
             f"ID: {registro['id_usuario']}."
         )
 
-    if nivel == "operador" and registro["cod_gestor"] is None:
+    if nivel == "OPERADOR" and registro["cod_gestor"] is None:
         raise ValueError(
-            f"Usuário operador {registro['id_usuario']} deve possuir gestor."
+            "Usuário operador deve possuir gestor. "
+            f"ID: {registro['id_usuario']}."
         )
 
-    if nivel != "operador" and registro["cod_gestor"] is not None:
+    if nivel != "OPERADOR" and registro["cod_gestor"] is not None:
         raise ValueError(
-            f"Usuário {nivel} {registro['id_usuario']} não pode possuir gestor."
+            f"Usuário {nivel} não pode possuir gestor. "
+            f"ID: {registro['id_usuario']}."
         )
 
 
@@ -250,11 +273,11 @@ def carregar_usuarios(
         FROM usuario
         WHERE {filtros}
         ORDER BY
-            CASE nivel_acesso
-                WHEN 'super_admin' THEN 1
-                WHEN 'admin' THEN 2
-                WHEN 'gestor' THEN 3
-                WHEN 'operador' THEN 4
+            CASE UPPER(BTRIM(nivel_acesso))
+                WHEN 'SUPER_ADMIN' THEN 1
+                WHEN 'ADMIN' THEN 2
+                WHEN 'GESTOR' THEN 3
+                WHEN 'OPERADOR' THEN 4
             END,
             id_usuario
         """,
@@ -321,7 +344,7 @@ def carregar_categorias(
         INSERT INTO tb_categoria (
             id, nome, temperatura_min, temperatura_max, vida_util_horas
         )
-        VALUES (%s, %s, %s, %s, %s::DOUBLE PRECISION * INTERVAL '1 hour')
+        VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (id) DO UPDATE
         SET nome = EXCLUDED.nome,
             temperatura_min = EXCLUDED.temperatura_min,
@@ -334,7 +357,7 @@ def carregar_categorias(
             registro["nome"],
             registro["temperatura_min"],
             registro["temperatura_max"],
-            registro["vida_util_horas"],
+            normalizar_vida_util(registro["vida_util_horas"]),
         ),
     )
 
@@ -380,7 +403,6 @@ def carregar_camaras(
         """
         SELECT
             f.id_frigorifico,
-            f.modelo,
             f.localizacao,
             f.temperatura_min,
             f.temperatura_max,
@@ -388,23 +410,35 @@ def carregar_camaras(
             t.id_termometro
         FROM frigorifico f
         JOIN termometro t ON t.id_frigorifico = f.id_frigorifico
-        WHERE f.{filtros}
+        WHERE {filtros}
         ORDER BY f.id_frigorifico
         """,
         ultima_execucao,
         limite_execucao,
+        alias_tabela="f",
     )
+    for registro in registros:
+        if registro["temperatura_min"] is None or registro["temperatura_max"] is None:
+            raise ValueError(
+                "Não foi possível determinar a faixa de temperatura da câmara "
+                f"{registro['id_frigorifico']}: os limites são obrigatórios "
+                "no legado."
+            )
+        if registro["temperatura_min"] >= registro["temperatura_max"]:
+            raise ValueError(
+                f"Faixa de temperatura inválida para a câmara {registro['id_frigorifico']}."
+            )
+
     return executar_upsert(
         destino,
         """
         INSERT INTO tb_camara_frigorifica (
-            id, modelo, localizacao, temperatura_min, temperatura_max,
+            id, localizacao, temperatura_min, temperatura_max,
             cod_cd, cod_termometro
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (id) DO UPDATE
-        SET modelo = EXCLUDED.modelo,
-            localizacao = EXCLUDED.localizacao,
+        SET localizacao = EXCLUDED.localizacao,
             temperatura_min = EXCLUDED.temperatura_min,
             temperatura_max = EXCLUDED.temperatura_max,
             cod_cd = EXCLUDED.cod_cd,
@@ -413,7 +447,6 @@ def carregar_camaras(
         registros,
         lambda registro: (
             registro["id_frigorifico"],
-            registro["modelo"],
             registro["localizacao"],
             registro["temperatura_min"],
             registro["temperatura_max"],
@@ -461,7 +494,7 @@ def carregar_lotes(
             registro["id_categoria"],
             registro["data_fabricacao"],
             registro["data_validade"],
-            registro["status"],
+            normalizar_status_lote(registro["status"]),
         ),
     )
 
