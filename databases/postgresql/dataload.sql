@@ -265,27 +265,24 @@ VALUES
 -- 8. CÂMARAS FRIGORÍFICAS
 -- =============================
 INSERT INTO tb_camara_frigorifica
-    (modelo, localizacao, temperatura_min, temperatura_max, cod_cd, cod_termometro)
+    (localizacao, temperatura_min, temperatura_max, cod_cd, cod_termometro)
 VALUES
-    ('ColdStorage CS-500', 'Setor Carnes - Câmara 01', 3.00, 4.50, 1, 1),
-    ('ColdStorage CS-500', 'Setor Carnes - Câmara 02', 2.00, 6.00, 1, 2),
-    ('FrioMaster FM-400', 'Setor Carnes - Câmara 03', 2.00, 6.00, 2, 3),
-    ('FrioMaster FM-400', 'Setor Carnes - Câmara 04', 2.00, 6.00, 2, 4),
-    ('RefrigPro RP-300', 'Setor Carnes - Câmara 05', 2.00, 6.00, 3, 5),
-    ('RefrigPro RP-300', 'Setor Carnes - Câmara 06', 2.00, 6.00, 3, 6),
-    ('ColdStorage CS-500', 'Setor Pescados - Câmara 01', -2.00, 2.00, 4, 7),
-    ('FrioMaster FM-400', 'Setor Pescados - Câmara 02', -2.00, 2.00, 4, 8),
-    ('RefrigPro RP-300', 'Setor Pescados - Câmara 03', -2.00, 2.00, 5, 9),
-    ('ColdStorage CS-500', 'Setor Congelados - Câmara 01', -22.00, -16.00, 1, 10),
-    ('FrioMaster FM-400', 'Setor Congelados - Câmara 02', -22.00, -16.00, 2, 11),
-    ('RefrigPro RP-300', 'Setor Congelados - Câmara 03', -22.00, -16.00, 3, 12);
+    ('Setor Carnes - Câmara 01', 3.00, 4.50, 1, 1),
+    ('Setor Carnes - Câmara 02', 2.00, 6.00, 1, 2),
+    ('Setor Carnes - Câmara 03', 2.00, 6.00, 2, 3),
+    ('Setor Carnes - Câmara 04', 2.00, 6.00, 2, 4),
+    ('Setor Carnes - Câmara 05', 2.00, 6.00, 3, 5),
+    ('Setor Carnes - Câmara 06', 2.00, 6.00, 3, 6),
+    ('Setor Pescados - Câmara 01', -2.00, 2.00, 4, 7),
+    ('Setor Pescados - Câmara 02', -2.00, 2.00, 4, 8),
+    ('Setor Pescados - Câmara 03', -2.00, 2.00, 5, 9),
+    ('Setor Congelados - Câmara 01', -22.00, -16.00, 1, 10),
+    ('Setor Congelados - Câmara 02', -22.00, -16.00, 2, 11),
+    ('Setor Congelados - Câmara 03', -22.00, -16.00, 3, 12);
 
 INSERT INTO tb_camara_frigorifica
-    (modelo, localizacao, temperatura_min, temperatura_max, cod_cd, cod_termometro)
+    (localizacao, temperatura_min, temperatura_max, cod_cd, cod_termometro)
 SELECT
-    CASE gs % 3 WHEN 0 THEN 'ColdStorage CS-500'
-                WHEN 1 THEN 'FrioMaster FM-400'
-                ELSE 'RefrigPro RP-300' END,
     CASE WHEN gs <= 20 THEN 'Setor Carnes - Câmara '
          WHEN gs <= 35 THEN 'Setor Pescados - Câmara '
          ELSE 'Setor Congelados - Câmara ' END || LPAD(gs::TEXT, 2, '0'),
