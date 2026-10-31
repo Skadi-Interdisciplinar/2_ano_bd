@@ -31,6 +31,7 @@ Camada relacional do **Skadi**, responsável pelo armazenamento e gerenciamento 
 | `data-mart.sql`               | Views dimensionais para BI (alertas e chamados) |
 | `data-mart.md`                | Grãos, dimensões, métricas e validação do Data Mart |
 | `backup-recuperacao.md`       | Procedimentos de backup lógico e recuperação de falhas |
+| `corrigir-geracao-alerta.sql`  | Atualização isolada da função de geração de alertas em banco existente |
 
 ---
 
@@ -51,6 +52,8 @@ A camada analítica está descrita em [data-mart.md](data-mart.md). Em banco exi
 Os procedimentos de backup e recuperação de falhas estão em [backup-recuperacao.md](backup-recuperacao.md).
 
 ### Massa de dados
+
+Para corrigir a tentativa de criar alertas duplicados em banco existente, execute somente `corrigir-geracao-alerta.sql`, sem reexecutar o deploy. A função serializa leituras da mesma câmara e só cria alerta se não existir outro `ATIVO` ou `RECONHECIDO`. Não apaga alertas ou leituras. Mensagens Redis que falharam anteriormente permanecem pendentes: o loop atual do worker lê apenas mensagens novas (`>`), portanto reiniciá-lo não reprocessa essas pendências automaticamente.
 
 O `dataload.sql` foi dimensionado para um banco recém-criado e carrega:
 
