@@ -177,28 +177,64 @@ ALTER TABLE tb_usuario ENABLE TRIGGER trg_auditoria_usuario;
 -- =============================
 -- 5. SOLICITAÇÕES DE SUPORTE
 -- =============================
-INSERT INTO tb_solicitacao_suporte
-    (cod_usuario_solicitante, categoria, descricao, status, data_hora_abertura)
-SELECT
-    operador.id,
-    (ARRAY['DUVIDA', 'SUGESTAO', 'RECLAMACAO', 'OUTRO'])[((gs - 1) % 4) + 1],
-    CASE ((gs - 1) % 4)
-        WHEN 0 THEN 'Dúvida sobre o procedimento de conferência da câmara.'
-        WHEN 1 THEN 'Sugestão para facilitar a consulta do histórico de leituras.'
-        WHEN 2 THEN 'Relato de dificuldade ao acessar uma funcionalidade do sistema.'
-        ELSE 'Solicitação de orientação sobre o uso da plataforma.'
-    END,
-    'REGISTRADO',
-    CURRENT_TIMESTAMP - ((gs % 20) * INTERVAL '1 day')
-FROM generate_series(1, 60) AS gs
-CROSS JOIN LATERAL (
-    SELECT id
-    FROM tb_usuario
-    WHERE nivel_acesso = 'OPERADOR'
-    ORDER BY id
-    OFFSET ((gs - 1) % 200)
-    LIMIT 1
-) operador;
+-- 60 chamados sintéticos: 20 REGISTRADO, 20 EM_ATENDIMENTO e 20 ATENDIDO.
+-- As transições passam pelas triggers normais, sem desativar validações.
+DO $$
+DECLARE
+    v_solicitantes INTEGER[];
+    v_responsaveis INTEGER[];
+    v_indice INTEGER;
+    v_chamado INTEGER;
+    v_responsavel INTEGER;
+    v_abertura TIMESTAMP;
+BEGIN
+    SELECT array_agg(id ORDER BY id) INTO v_solicitantes
+    FROM tb_usuario WHERE nivel_acesso = 'OPERADOR';
+    SELECT array_agg(id ORDER BY id) INTO v_responsaveis
+    FROM tb_usuario WHERE nivel_acesso = 'SUPER_ADMIN' AND username <> 'skadi_worker';
+
+    IF v_solicitantes IS NULL OR v_responsaveis IS NULL THEN
+        RAISE EXCEPTION 'A massa de suporte exige OPERADOR e SUPER_ADMIN cadastrados.';
+    END IF;
+
+    FOR v_indice IN 1..60 LOOP
+        v_abertura := (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')
+            - (((v_indice - 1) % 20) + 1) * INTERVAL '1 day'
+            - (v_indice % 8) * INTERVAL '1 hour';
+        v_responsavel := v_responsaveis[((v_indice - 1) % array_length(v_responsaveis, 1)) + 1];
+
+        INSERT INTO tb_solicitacao_suporte (
+            cod_usuario_solicitante, categoria, descricao, status, data_hora_abertura
+        ) VALUES (
+            v_solicitantes[((v_indice - 1) % array_length(v_solicitantes, 1)) + 1],
+            (ARRAY['DUVIDA', 'SUGESTAO', 'RECLAMACAO', 'OUTRO'])[((v_indice - 1) % 4) + 1],
+            '[TESTE_SUPORTE_' || lpad(v_indice::text, 3, '0') || '] '
+                || CASE ((v_indice - 1) % 4)
+                    WHEN 0 THEN 'Dúvida sobre o procedimento de conferência da câmara.'
+                    WHEN 1 THEN 'Sugestão para facilitar a consulta do histórico de leituras.'
+                    WHEN 2 THEN 'Relato de dificuldade ao acessar uma funcionalidade do sistema.'
+                    ELSE 'Solicitação de orientação sobre o uso da plataforma.'
+                   END,
+            'REGISTRADO', v_abertura
+        ) RETURNING id INTO v_chamado;
+
+        IF v_indice % 3 IN (1, 2) THEN
+            UPDATE tb_solicitacao_suporte
+            SET status = 'EM_ATENDIMENTO', cod_usuario_responsavel = v_responsavel
+            WHERE id = v_chamado;
+        END IF;
+
+        IF v_indice % 3 = 2 THEN
+            UPDATE tb_solicitacao_suporte
+            SET status = 'ATENDIDO',
+                resposta = 'Resposta de demonstração para teste do dashboard de suporte.',
+                data_hora_encerramento = v_abertura
+                    + (((v_indice * 7) % 24) + 1) * INTERVAL '30 minutes'
+            WHERE id = v_chamado;
+        END IF;
+    END LOOP;
+END;
+$$;
 
 -- =============================
 -- 6. TERMÔMETROS
