@@ -1,0 +1,38 @@
+name: Simulacao - Temperaturas MQTT e Redis
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: simulacao-temperaturas
+  cancel-in-progress: false
+
+jobs:
+  simular-leituras:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      SKADI_DATABASE_URL: ${{ secrets.SKADI_DATABASE_URL }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+      MQTT_BROKER: ${{ vars.MQTT_BROKER || 'broker.mqttdashboard.com' }}
+      MQTT_PORT: ${{ vars.MQTT_PORT || '1883' }}
+      MQTT_TOPIC: ${{ vars.MQTT_TOPIC || 'camara-fria/temperatura' }}
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar dependencias
+        run: pip install -r databases/redis/requirements.txt
+      - name: Validar configuracao obrigatoria
+        run: |
+          python -c "import os; faltam = [n for n in ('SKADI_DATABASE_URL', 'REDIS_URL') if not os.getenv(n)]; assert not faltam, 'Configure os Secrets: ' + ', '.join(faltam)"
+      - name: Simular um lote e coletar no Redis
+        run: python databases/redis/simulacao_ciclo.py
