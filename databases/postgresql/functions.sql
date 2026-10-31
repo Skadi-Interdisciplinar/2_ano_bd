@@ -93,13 +93,11 @@ BEGIN
     END IF;
 
     IF v_diferenca <= 1 THEN
-        RETURN 'BAIXA';
+        RETURN 'BAIXO';
     ELSIF v_diferenca <= 3 THEN
         RETURN 'ATENCAO';
-    ELSIF v_diferenca <= 5 THEN
-        RETURN 'URGENTE';
     ELSE
-        RETURN 'CRITICA';
+        RETURN 'CRITICO';
     END IF;
 END;
 $$ LANGUAGE plpgsql;

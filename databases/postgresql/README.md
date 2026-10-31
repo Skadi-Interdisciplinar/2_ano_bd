@@ -54,7 +54,7 @@ O `dataload.sql` foi dimensionado para um banco recém-criado e carrega:
 * 60 solicitações de suporte, todas inicialmente `REGISTRADO`;
 * 132 lotes e 132 vínculos com câmaras compatíveis;
 * 150 leituras: 100 normais e 50 fora da faixa. As triggers geram 50 alertas e 50 atendimentos. Para cada alerta, é criada uma notificação para cada operador do CD correspondente, totalizando 500 notificações;
-* 10 alertas reconhecidos, cinco deles resolvidos com justificativas após a normalização da temperatura; um alerta urgente também é escalonado para GESTOR;
+* 10 alertas reconhecidos, cinco deles resolvidos com justificativas após a normalização da temperatura; um alerta CRITICO também é escalonado para GESTOR;
 * 23 relatórios: um por CD e três adicionais; 15 assinaturas RSA de demonstração;
 * 605 eventos de acesso: cinco explícitos, 100 distribuídos em quatro horas e 500 distribuídos ao longo dos últimos dias.
 
@@ -164,10 +164,9 @@ A gravidade é definida pela diferença absoluta entre a temperatura medida e a 
 
 | Diferença | Gravidade |
 | --------: | --------- |
-|    ≤ 1 °C | Estável   |
-|    ≤ 3 °C | Atenção   |
-|    ≤ 5 °C | Crítica   |
-|    > 5 °C | Urgente   |
+|    ≤ 1 °C | BAIXO    |
+|    ≤ 3 °C | ATENCAO  |
+|    > 3 °C | CRITICO  |
 
 ---
 
