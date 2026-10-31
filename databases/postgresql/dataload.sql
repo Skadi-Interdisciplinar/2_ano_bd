@@ -538,13 +538,13 @@ FROM (VALUES
 ) AS assinaturas(cod_relatorio, assinatura)
 JOIN tb_relatorio relatorio ON relatorio.id = assinaturas.cod_relatorio;
 
--- Simula o escalonamento de um alerta urgente.
+-- Simula o escalonamento de um alerta CRITICO.
 UPDATE tb_alerta
 SET nivel_atual = 'GESTOR'
 WHERE id = (
     SELECT id
     FROM tb_alerta
-    WHERE nivel_gravidade = 'URGENTE'
+    WHERE nivel_gravidade = 'CRITICO'
     ORDER BY id DESC
     LIMIT 1
 );

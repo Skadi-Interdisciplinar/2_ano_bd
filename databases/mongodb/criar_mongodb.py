@@ -76,7 +76,7 @@ validator_predicoes = {
             # e ideal. Os valores abaixo são os retornados pela função atual.
             "gravidade": {
                 "bsonType": "string",
-                "enum": ["baixa", "atenção", "urgente", "crítica"],
+                "enum": ["BAIXO", "ATENCAO", "CRITICO"],
             },
             # A escala de probabilidade ainda não foi definida; por isso não é
             # restringida artificialmente a 0-1 neste momento.

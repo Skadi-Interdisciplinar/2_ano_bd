@@ -218,7 +218,7 @@ CREATE TABLE tb_alerta (
 		)
 	),
 	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('OPERADOR', 'GESTOR', 'ADMIN')),
-	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('BAIXA', 'ATENCAO', 'URGENTE', 'CRITICA')),
+	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('BAIXO', 'ATENCAO', 'CRITICO')),
 	CONSTRAINT ck_alerta_status CHECK (status IN ('ATIVO', 'RECONHECIDO', 'RESOLVIDO')),
 	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('TEMPERATURA_FORA_PADRAO'))
 );
@@ -408,13 +408,11 @@ BEGIN
     END IF;
 
     IF v_diferenca <= 1 THEN
-        RETURN 'BAIXA';
+        RETURN 'BAIXO';
     ELSIF v_diferenca <= 3 THEN
         RETURN 'ATENCAO';
-    ELSIF v_diferenca <= 5 THEN
-        RETURN 'URGENTE';
     ELSE
-        RETURN 'CRITICA';
+        RETURN 'CRITICO';
     END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -1515,7 +1513,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_alerta', 'cod_camara_frigorifica', 'INTEGER', TRUE, 'FK', 'Câmara frigorífica que originou o alerta', 'Todo alerta pertence à câmara que originou a ocorrência', 'OPERADOR', FALSE),
 ('tb_alerta', 'vida_util_referencia_horas', 'INTERVAL HOUR TO MINUTE', FALSE, NULL, 'Menor vida útil entre os lotes ativos no momento do alerta', 'Quando informada, deve ser positiva e menor que 1000 horas; base dos prazos fixos de escalonamento', 'GESTOR', FALSE),
 ('tb_alerta', 'status', 'VARCHAR(100)', TRUE, NULL, 'Fase do atendimento do alerta', 'Não confundir com nivel_atual: status é sobre o atendimento (ATIVO/RECONHECIDO/RESOLVIDO), nivel_atual é sobre o cargo responsável', 'OPERADOR', FALSE),
-('tb_alerta', 'nivel_gravidade', 'VARCHAR(100)', TRUE, NULL, 'Gravidade do alerta', 'Calculada via fn_calcular_gravidade_alerta: BAIXA, ATENCAO, URGENTE ou CRITICA', 'OPERADOR', FALSE),
+('tb_alerta', 'nivel_gravidade', 'VARCHAR(100)', TRUE, NULL, 'Gravidade do alerta', 'Calculada via fn_calcular_gravidade_alerta: BAIXO, ATENCAO ou CRITICO', 'OPERADOR', FALSE),
 ('tb_alerta', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento de criação do alerta', 'Usado como referência para o escalonamento', 'OPERADOR', FALSE),
 ('tb_alerta', 'tipo', 'VARCHAR(100)', TRUE, NULL, 'Tipo da ocorrência', 'Atualmente limitado a TEMPERATURA_FORA_PADRAO', 'OPERADOR', FALSE),
 

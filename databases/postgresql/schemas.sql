@@ -214,7 +214,7 @@ CREATE TABLE tb_alerta (
 		)
 	),
 	CONSTRAINT ck_alerta_nivel_atual CHECK (nivel_atual IN ('OPERADOR', 'GESTOR', 'ADMIN')),
-	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('BAIXA', 'ATENCAO', 'URGENTE', 'CRITICA')),
+	CONSTRAINT ck_alerta_nivel_gravidade CHECK (nivel_gravidade IN ('BAIXO', 'ATENCAO', 'CRITICO')),
 	CONSTRAINT ck_alerta_status CHECK (status IN ('ATIVO', 'RECONHECIDO', 'RESOLVIDO')),
 	CONSTRAINT ck_alerta_tipo CHECK (tipo IN ('TEMPERATURA_FORA_PADRAO'))
 );
