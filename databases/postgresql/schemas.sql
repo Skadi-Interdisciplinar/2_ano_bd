@@ -152,7 +152,6 @@ CREATE TABLE tb_categoria (
 
 CREATE TABLE tb_camara_frigorifica (
 	id SERIAL,
-	modelo VARCHAR(150) NOT NULL,
 	localizacao VARCHAR(100) NOT NULL,
 	temperatura_min DECIMAL(5,2) NOT NULL,
 	temperatura_max DECIMAL(5,2) NOT NULL,

@@ -16,7 +16,7 @@ SELECT data AS data_id, EXTRACT(YEAR FROM data)::integer AS ano,
 FROM datas WHERE data IS NOT NULL;
 
 CREATE OR REPLACE VIEW public.vw_dim_camara AS
-SELECT c.id AS camara_id, c.modelo, c.localizacao,
+SELECT c.id AS camara_id, c.localizacao,
        c.cod_cd AS cd_id, cd.nome AS cd_nome,
        c.cod_termometro AS termometro_id
 FROM public.tb_camara_frigorifica c

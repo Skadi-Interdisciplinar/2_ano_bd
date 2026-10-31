@@ -4,6 +4,8 @@ Execute `data-mart.sql` depois de `deploy.sql`, no banco novo. Para um banco já
 
 ## Modelagem dimensional
 
+A dimensão câmara não possui `modelo`; o modelo do termômetro permanece no cadastro operacional. Para remover a coluna em banco existente que já possui a view, use `remover-modelo-camara.sql`. Esse script recria apenas a view de câmara: confira e reaplique suas concessões de leitura após a execução. Dependências externas impedem a remoção sem `CASCADE` e devem ser revisadas antes.
+
 São duas estrelas virtuais no schema `public`, construídas sobre as tabelas operacionais existentes.
 
 | Fato e grão | Dimensões e ligações |
