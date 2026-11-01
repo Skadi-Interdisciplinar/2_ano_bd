@@ -2,6 +2,7 @@
 -- TRANSFORMAÇÕES ETL: CTEs, WINDOW FUNCTIONS E CTE RECURSIVA
 -- ====================================================================
 
+CREATE OR REPLACE VIEW public.vw_bi_leituras_temperatura AS
 WITH leituras_classificadas AS (
 	SELECT
 		lt.id AS cod_leitura,
@@ -48,6 +49,7 @@ SELECT
 FROM leituras_classificadas;
 
 
+CREATE OR REPLACE VIEW public.vw_bi_lotes_ativos_camara AS
 WITH lotes_ativos AS (
 	SELECT
 		l.id AS cod_lote,
@@ -75,6 +77,7 @@ SELECT
 FROM lotes_ativos;
 
 
+CREATE OR REPLACE VIEW public.vw_bi_etapas_escalonamento AS
 WITH RECURSIVE etapas_escalonamento AS (
 	SELECT
 		a.id AS cod_alerta,

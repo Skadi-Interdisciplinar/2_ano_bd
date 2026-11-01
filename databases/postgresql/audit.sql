@@ -24,6 +24,7 @@ CREATE TABLE tb_log_acesso (
 CREATE TABLE tb_log_auditoria (
 	id SERIAL,
 	cod_usuario INTEGER,
+	usuario_bd TEXT DEFAULT CURRENT_USER,
 	acao VARCHAR(150) NOT NULL,
 	entidade_afetada VARCHAR(50) NOT NULL,
 	entidade_id INTEGER NOT NULL,
@@ -81,11 +82,12 @@ BEGIN
 	END IF;
 
 	INSERT INTO tb_log_auditoria (
-		cod_usuario, acao, entidade_afetada, entidade_id,
+		cod_usuario, usuario_bd, acao, entidade_afetada, entidade_id,
 		dados_antigos, dados_novos
 	)
 	VALUES (
 		NULLIF(current_setting('app.usuario_atual', TRUE), '')::INTEGER,
+		CURRENT_USER,
 		TG_OP,
 		TG_TABLE_NAME,
 		v_entidade_id,
@@ -137,11 +139,12 @@ BEGIN
 	END IF;
 
 	INSERT INTO tb_log_auditoria (
-		cod_usuario, acao, entidade_afetada, entidade_id,
+		cod_usuario, usuario_bd, acao, entidade_afetada, entidade_id,
 		dados_antigos, dados_novos
 	)
 	VALUES (
 		NULLIF(current_setting('app.usuario_atual', TRUE), '')::INTEGER,
+		CURRENT_USER,
 		TG_OP,
 		TG_TABLE_NAME,
 		v_cod_admin,

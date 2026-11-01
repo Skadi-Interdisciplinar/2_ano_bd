@@ -12,7 +12,7 @@ responder uma pergunta de negócio por meio de traversal.
 | `load_graph.py` | Sincroniza os dados reais do PostgreSQL com o Neo4j Aura. |
 | `queries/queries.cypher` | Consultas de visualização e exploração do grafo. |
 | `queries/traversal.cypher` | Consultas de negócio que percorrem múltiplos relacionamentos. |
-| `diagramas/` | Capturas PNG das respostas exibidas no Aura. |
+| `diagrams/` | Capturas PNG anteriores das respostas exibidas no Aura; não são evidência desta validação. |
 
 ## 1. Modelo de grafo
 
@@ -44,8 +44,16 @@ responder uma pergunta de negócio por meio de traversal.
 O PostgreSQL continua sendo a fonte oficial e transacional. O arquivo
 `load_graph.py` consulta as tabelas principais e replica os dados no Aura.
 
-Assim, o grafo usado nas consultas representa dados reais do projeto, e não
-registros criados apenas para simulação.
+A origem depende das credenciais configuradas: a validação desta entrega usou
+somente uma massa sintética em PostgreSQL e Neo4j locais descartáveis. Não foi
+executada carga no Aura nem verificado o conteúdo de um ambiente real.
+
+A câmara contém localização, limites e relacionamentos, sem `modelo`.
+O modelo do termômetro permanece em `Termometro.modelo`. Categorias usam
+`temperatura_min` e `temperatura_max`, sem `temperatura_ideal`. A sincronização
+remove explicitamente as duas propriedades obsoletas dos nós atualizados.
+O carregador faz MERGE: não é um mecanismo de exclusão geral de entidades
+que já desapareceram da origem.
 
 ## 3. Como executar
 
@@ -81,6 +89,18 @@ Usuario → CD → CamaraFrigorifica → Lote → Categoria
 A consulta em `queries/traversal.cypher` cruza usuários, CDs, câmaras, lotes,
 categorias, alertas e atendimentos. Portanto, a resposta depende da travessia
 de vários relacionamentos e atende ao requisito de traversal.
+
+Informe o parâmetro `categoria_nome` com um nome existente em Categoria (no
+Neo4j Browser, `:param categoria_nome => 'nome existente'`). O filtro considera
+apenas atendimentos `PENDENTE` ou `EM_ANDAMENTO`, em maiúsculo conforme o banco.
+Os caminhos e relacionamentos permanecem os mesmos. `TRABALHA_NO_CD` representa
+o cod_cd operacional do usuário; não representa os CDs administrados por ADMIN
+via tb_admin_cd. O traversal mantém a pergunta original, sem expandir esse escopo.
+
+O teste isolado carrega duas vezes, verifica ausência das propriedades antigas,
+obtém resultados positivos e testa que atendimentos RESOLVIDO não retornam.
+Ver [resultado](../postgresql/evidencias/validacao-requisitos.md) e
+[execução reproduzível](../../tests/README.md).
 
 ## 5. Estrutura do diretório
 

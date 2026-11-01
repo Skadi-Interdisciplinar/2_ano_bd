@@ -1192,6 +1192,7 @@ CREATE TABLE tb_log_acesso (
 CREATE TABLE tb_log_auditoria (
 	id SERIAL,
 	cod_usuario INTEGER,
+	usuario_bd TEXT DEFAULT CURRENT_USER,
 	acao VARCHAR(150) NOT NULL,
 	entidade_afetada VARCHAR(50) NOT NULL,
 	entidade_id INTEGER NOT NULL,
@@ -1249,11 +1250,12 @@ BEGIN
 	END IF;
 
 	INSERT INTO tb_log_auditoria (
-		cod_usuario, acao, entidade_afetada, entidade_id,
+		cod_usuario, usuario_bd, acao, entidade_afetada, entidade_id,
 		dados_antigos, dados_novos
 	)
 	VALUES (
 		NULLIF(current_setting('app.usuario_atual', TRUE), '')::INTEGER,
+		CURRENT_USER,
 		TG_OP,
 		TG_TABLE_NAME,
 		v_entidade_id,
@@ -1305,11 +1307,12 @@ BEGIN
 	END IF;
 
 	INSERT INTO tb_log_auditoria (
-		cod_usuario, acao, entidade_afetada, entidade_id,
+		cod_usuario, usuario_bd, acao, entidade_afetada, entidade_id,
 		dados_antigos, dados_novos
 	)
 	VALUES (
 		NULLIF(current_setting('app.usuario_atual', TRUE), '')::INTEGER,
+		CURRENT_USER,
 		TG_OP,
 		TG_TABLE_NAME,
 		v_cod_admin,
@@ -1422,15 +1425,12 @@ FOR EACH ROW EXECUTE FUNCTION fn_log_escalonamento();
 -- ====================================================================
 
 -- ====================================================================
--- LIMPEZA E CRIAÇÃO DA TABELA
+-- CRIAÇÃO IDEMPOTENTE E COMPLEMENTAÇÃO DO CATÁLOGO
 -- Tabela centralizadora do Catálogo de Dados corporativo.
 -- Armazena o inventário de metadados, regras de negócio e mapeamento de segurança.
 -- Serve para auditoria, controle de LGPD e documentação técnica unificada.
 -- ====================================================================
-DROP TABLE IF EXISTS tb_catalogo_dados;
-
-
-CREATE TABLE tb_catalogo_dados (
+CREATE TABLE IF NOT EXISTS tb_catalogo_dados (
 	id SERIAL,
 	nome_tabela VARCHAR(100) NOT NULL,
 	nome_coluna VARCHAR(100) NOT NULL,
@@ -1469,13 +1469,13 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- tb_usuario
 -- ==============================================
 ('tb_usuario', 'id', 'SERIAL', TRUE, 'PK', 'Identificador único do funcionário', NULL, 'OPERADOR', FALSE),
-('tb_usuario', 'username', 'VARCHAR(50)', TRUE, 'NK', 'Nome de usuário para autenticação', 'Único no sistema; usado no login da aplicação e mantido nos snapshots de auditoria para identificar alterações', 'ADMIN', TRUE),
-('tb_usuario', 'cpf', 'VARCHAR(11)', TRUE, 'NK', 'CPF do funcionário', 'Único no sistema; dado pessoal protegido por LGPD', 'ADMIN', TRUE),
+('tb_usuario', 'username', 'VARCHAR(50)', TRUE, 'NK', 'Nome de usuário para autenticação', 'Único no sistema; usado no login da aplicação', 'ADMIN', TRUE),
+('tb_usuario', 'cpf', 'VARCHAR(11)', FALSE, 'NK', 'CPF do funcionário', 'Único quando informado; obrigatório para ADMIN, GESTOR e OPERADOR; deve ser NULL para SUPER_ADMIN', 'ADMIN', TRUE),
 ('tb_usuario', 'email', 'VARCHAR(255)', TRUE, 'NK', 'E-mail do funcionário', 'Único no sistema; usado para login e notificações', 'ADMIN', TRUE),
 ('tb_usuario', 'senha', 'VARCHAR(255)', TRUE, NULL, 'Hash da senha de acesso', 'Nunca armazenada em texto plano; nunca exposta em relatórios ou exports', 'ADMIN', TRUE),
 ('tb_usuario', 'nivel_acesso', 'VARCHAR(11)', TRUE, NULL, 'Cargo do funcionário no sistema', 'Níveis: OPERADOR, GESTOR, ADMIN e SUPER_ADMIN; acessos técnicos ao banco são controlados por roles PostgreSQL', 'GESTOR', FALSE),
 ('tb_usuario', 'cod_cd', 'INTEGER', FALSE, 'FK', 'Centro de distribuição direto do funcionário', 'Obrigatório para GESTOR e OPERADOR; deve ser NULL para ADMIN e SUPER_ADMIN. CDs do ADMIN são mantidos em tb_admin_cd', 'OPERADOR', FALSE),
-('tb_usuario', 'cod_gestor', 'INTEGER', FALSE, 'FK', 'Gestor responsável pelo funcionário', 'Opcional; deve referenciar um usuário com nível gestor e do mesmo CD', 'GESTOR', FALSE),
+('tb_usuario', 'cod_gestor', 'INTEGER', FALSE, 'FK', 'Gestor responsável pelo funcionário', 'Obrigatório para OPERADOR; deve ser NULL nos demais perfis. Referencia um GESTOR do mesmo CD', 'GESTOR', FALSE),
 
 -- ==============================================
 -- tb_admin_cd
@@ -1502,15 +1502,15 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 -- tb_lote_camara_frigorifica
 -- ==============================================
-('tb_lote_camara_frigorifica', 'cod_lote', 'INTEGER', TRUE, 'FK', 'Lote movimentado', 'Um lote pode passar por várias câmaras frigoríficas ao longo do tempo', 'OPERADOR', FALSE),
+('tb_lote_camara_frigorifica', 'cod_lote', 'INTEGER', TRUE, 'FK', 'Lote movimentado', 'Um lote pode possuir registros de movimentação em câmaras ao longo do tempo', 'OPERADOR', FALSE),
 ('tb_lote_camara_frigorifica', 'cod_camara_frigorifica', 'INTEGER', TRUE, 'FK', 'Câmara frigorífica do lote', 'Apenas uma localização atual pode ficar aberta por lote', 'OPERADOR', FALSE),
 ('tb_lote_camara_frigorifica', 'data_entrada', 'TIMESTAMP', TRUE, NULL, 'Entrada do lote na câmara frigorífica', 'Início do período de armazenamento', 'OPERADOR', FALSE),
-('tb_lote_camara_frigorifica', 'data_saida', 'TIMESTAMP', FALSE, NULL, 'Saída do lote da câmara frigorífica', 'NULL indica a localização atual', 'OPERADOR', FALSE),
+('tb_lote_camara_frigorifica', 'data_saida', 'TIMESTAMP', FALSE, NULL, 'Saída do lote da câmara frigorífica', 'NULL indica vínculo ainda aberto; a constraint exige saída posterior à entrada quando informada', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_camara_frigorifica
 -- ==============================================
-('tb_camara_frigorifica', 'cod_termometro', 'INTEGER', TRUE, 'FK', 'Termômetro instalado na câmara frigorífica', 'Relação 1:1 — cada termômetro pertence a exatamente uma câmara frigorífica (UNIQUE)', 'OPERADOR', FALSE),
+('tb_camara_frigorifica', 'cod_termometro', 'INTEGER', TRUE, 'FK', 'Termômetro instalado na câmara frigorífica', 'Cada câmara exige um termômetro; UNIQUE impede que ele esteja em mais de uma câmara. Um termômetro pode ainda não estar associado', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_alerta
@@ -1546,7 +1546,7 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 ('tb_atendimento', 'cod_usuario', 'INTEGER', FALSE, 'FK', 'Funcionário responsável pelo atendimento', 'Aceita NULL: atendimento nasce PENDENTE (via trigger), sem usuário atribuído até alguém reconhecer o alerta', 'OPERADOR', FALSE),
 ('tb_atendimento', 'status', 'VARCHAR(50)', TRUE, NULL, 'Situação do atendimento', 'PENDENTE -> EM_ANDAMENTO -> RESOLVIDO; transições controladas por sp_reconhecer_alerta e trigger de justificativa', 'OPERADOR', FALSE),
 ('tb_atendimento', 'data_hora_reconhecimento', 'TIMESTAMP', FALSE, NULL, 'Momento em que alguém assumiu o alerta', 'Diferente de data_hora_resolucao: reconhecimento é "estou ciente", resolução é "problema resolvido de fato"', 'OPERADOR', FALSE),
-('tb_atendimento', 'data_hora_resolucao', 'TIMESTAMP', FALSE, NULL, 'Momento em que o atendimento foi finalizado', 'Métrica de HACCP: mede quanto tempo o lote ficou de fato em risco, não só sem monitoramento', 'OPERADOR', FALSE),
+('tb_atendimento', 'data_hora_resolucao', 'TIMESTAMP', FALSE, NULL, 'Momento em que o atendimento foi finalizado', 'Registra conclusão do atendimento; isoladamente não comprova duração de exposição térmica de um lote', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_justificativa
@@ -1573,24 +1573,145 @@ INSERT INTO tb_catalogo_dados (nome_tabela, nome_coluna, tipo_dado, obrigatorio,
 -- ==============================================
 -- tb_log_auditoria
 -- ==============================================
-('tb_log_auditoria', 'cod_usuario', 'INTEGER', FALSE, NULL, 'ID do usuário da aplicação associado à ação, quando informado', 'Pode ser NULL em operações sem contexto de usuário; não possui FK para preservar a referência histórica mesmo se o usuário for removido', 'ADMIN', FALSE),
+('tb_log_auditoria', 'cod_usuario', 'INTEGER', FALSE, NULL, 'ID do usuário da aplicação associado à ação, quando informado', 'Pode ser NULL em operações sem contexto de usuário', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'acao', 'VARCHAR(150)', TRUE, NULL, 'Operação executada sobre a entidade', 'Recebe INSERT, UPDATE ou DELETE do trigger de auditoria', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'entidade_afetada', 'VARCHAR(50)', TRUE, NULL, 'Nome da tabela alterada', 'Identifica a entidade cujo histórico está sendo registrado', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'entidade_id', 'INTEGER', TRUE, NULL, 'Referência numérica da entidade alterada', 'Em tb_admin_cd contém cod_admin; o par cod_admin/cod_cd fica nos snapshots, pois a chave é composta', 'ADMIN', FALSE),
-('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Snapshot sanitizado da linha antes da operação', 'Preenchido em UPDATE/DELETE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
+('tb_log_auditoria', 'dados_antigos', 'JSONB', FALSE, NULL, 'Estado da linha antes da alteração (OLD)', 'Preenchido apenas em UPDATE/DELETE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'dados_novos', 'JSONB', FALSE, NULL, 'Snapshot sanitizado da linha depois da operação', 'Preenchido em INSERT/UPDATE; omite CPF, e-mail, senha, hash e conteúdo de relatório, número de série, carimbo de tempo e IP', 'ADMIN', FALSE),
 ('tb_log_auditoria', 'data_hora', 'TIMESTAMP', TRUE, NULL, 'Momento em que a operação foi registrada', 'Gerado pelo banco com CURRENT_TIMESTAMP', 'ADMIN', FALSE),
 
 -- ==============================================
 -- tb_log_escalonamento
 -- ==============================================
-('tb_log_escalonamento', 'nivel_anterior', 'VARCHAR(8)', FALSE, NULL, 'Cargo que tinha o alerta antes da escalada', 'NULL na primeira escalada (alerta nasce sem "nível anterior")', 'OPERADOR', FALSE),
+('tb_log_escalonamento', 'nivel_anterior', 'VARCHAR(8)', FALSE, NULL, 'Cargo que tinha o alerta antes da escalada', 'Recebe OLD.nivel_atual quando a trigger registra mudança de nível', 'OPERADOR', FALSE),
 
 -- ==============================================
 -- tb_log_acesso
 -- ==============================================
-('tb_log_acesso', 'ip_origem', 'INET', TRUE, NULL, 'Endereço IP de onde partiu a tentativa de acesso', 'Considerado dado pessoal pela LGPD (permite identificação indireta do usuário)', 'ADMIN', TRUE);
+('tb_log_acesso', 'ip_origem', 'INET', TRUE, NULL, 'Endereço IP de onde partiu a tentativa de acesso', 'Identificador de origem potencialmente pessoal; não usar como identidade do usuário', 'ADMIN', TRUE)
+ON CONFLICT (nome_tabela, nome_coluna) DO UPDATE
+SET descricao = EXCLUDED.descricao, regra_negocio = EXCLUDED.regra_negocio;
 
+-- As classificações existentes são preservadas. Novas colunas recebem os
+-- níveis aprovados. Este inventário NÃO concede permissões SQL/aplicativas.
+WITH colunas AS (
+    SELECT c.relname AS tabela, a.attname AS coluna,
+           pg_catalog.format_type(a.atttypid, a.atttypmod) AS tipo,
+           a.attnotnull AS obrigatorio,
+           CASE
+             WHEN EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid
+                          AND k.contype='p' AND a.attnum=ANY(k.conkey)) THEN 'PK'
+             WHEN EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid
+                          AND k.contype='f' AND a.attnum=ANY(k.conkey)) THEN 'FK'
+             WHEN EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid
+                          AND k.contype='u' AND a.attnum=ANY(k.conkey)) THEN 'NK'
+           END AS chave,
+           (SELECT string_agg(k.conname || ': ' || pg_get_constraintdef(k.oid), '; ' ORDER BY k.conname)
+            FROM pg_constraint k WHERE k.conrelid=c.oid AND a.attnum=ANY(k.conkey)) AS constraints_coluna,
+           pg_get_expr(d.adbin, d.adrelid) AS valor_padrao
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped
+    LEFT JOIN pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum
+    WHERE n.nspname='public' AND c.relkind IN ('r','p') AND c.relname LIKE 'tb\_%' ESCAPE '\'
+), descricoes(coluna, descricao) AS (
+    VALUES
+      ('id', 'Identificador da linha; consultar as constraints para o escopo da chave'),
+      ('nome', 'Nome de apresentação da entidade cadastrada'),
+      ('modelo', 'Identificação do modelo do termômetro'),
+      ('localizacao', 'Localização cadastrada da câmara frigorífica'),
+      ('temperatura_min', 'Limite inferior de temperatura cadastrado, em graus Celsius'),
+      ('temperatura_max', 'Limite superior de temperatura cadastrado, em graus Celsius'),
+      ('cep', 'Código postal do endereço do centro de distribuição'),
+      ('rua', 'Logradouro do endereço do centro de distribuição'),
+      ('numero', 'Número do endereço do centro de distribuição'),
+      ('complemento', 'Complemento do endereço, quando informado'),
+      ('bairro', 'Bairro do centro de distribuição'),
+      ('cidade', 'Cidade do centro de distribuição'),
+      ('cod_estado', 'Referência à unidade federativa cadastrada'),
+      ('cod_cd', 'Referência ao centro de distribuição; observar as regras da tabela'),
+      ('cod_alerta', 'Referência ao alerta associado ao registro'),
+      ('status', 'Estado atual do registro no fluxo da entidade'),
+      ('categoria', 'Categoria escolhida para a solicitação de suporte'),
+      ('descricao', 'Texto livre de descrição fornecido no fluxo da entidade'),
+      ('resposta', 'Texto de resposta registrado no atendimento de suporte'),
+      ('cod_usuario_solicitante', 'Usuário que abriu a solicitação de suporte'),
+      ('cod_usuario_responsavel', 'SUPER_ADMIN responsável pelo suporte, quando atribuído'),
+      ('data_hora_abertura', 'Data e hora de abertura do chamado'),
+      ('data_hora_encerramento', 'Data e hora de encerramento do chamado, quando concluído'),
+      ('nome_carga', 'Identificador da carga utilizado para recuperar seu checkpoint'),
+      ('cod_usuario_gerador', 'Usuário identificado como autor da geração do relatório'),
+      ('data_hora_geracao', 'Data e hora de geração do relatório'),
+      ('cod_usuario', 'Usuário da aplicação associado ao evento, quando identificado'),
+      ('usuario_bd', 'CURRENT_USER da conexão que executou a operação; NULL em histórico sem autoria recuperável'),
+      ('data_hora', 'Data e hora registrada para o evento'),
+      ('motivo', 'Motivo registrado no fluxo da entidade'),
+      ('tentativa_sucesso', 'Indica se a tentativa de autenticação foi bem-sucedida'),
+      ('motivo_falha', 'Motivo da falha de acesso, quando houver'),
+      ('user_agent', 'Identificação do cliente HTTP que originou a tentativa de acesso'),
+      ('nivel_novo', 'Nível responsável após a mudança de escalonamento'),
+      ('cod_relatorio', 'Relatório ao qual a assinatura se refere'),
+      ('certificado_titular', 'Titular informado no certificado da assinatura'),
+      ('autoridade_certificadora', 'Autoridade indicada no certificado da assinatura'),
+      ('algoritmo_assinatura', 'Algoritmo informado para verificar a assinatura'),
+      ('assinatura', 'Assinatura digital armazenada para o relatório'),
+      ('data_assinatura', 'Data registrada para a assinatura do relatório'),
+      ('nome_tabela', 'Nome da tabela descrita pelo metadado'),
+      ('nome_coluna', 'Nome da coluna descrita pelo metadado'),
+      ('tipo_dado', 'Tipo efetivo da coluna no PostgreSQL'),
+      ('obrigatorio', 'Indica NOT NULL físico; regras condicionais ficam em regra_negocio'),
+      ('chave', 'Classificação estrutural: PK precede FK, que precede chave única NK'),
+      ('regra_negocio', 'Descrição documental das regras e das constraints da coluna'),
+      ('nivel_acesso_leitura', 'Classificação documental aprovada; não concede acesso ao banco'),
+      ('dado_sensivel', 'Sinalização conservadora de conteúdo potencialmente sensível')
+)
+INSERT INTO tb_catalogo_dados (
+    nome_tabela, nome_coluna, tipo_dado, obrigatorio, chave,
+    descricao, regra_negocio, nivel_acesso_leitura, dado_sensivel
+)
+SELECT c.tabela, c.coluna, c.tipo, c.obrigatorio, c.chave,
+       COALESCE(d.descricao, 'Campo ' || c.coluna || ' de ' || c.tabela || '; consultar as constraints registradas'),
+       NULL::TEXT,
+       CASE
+         WHEN c.tabela IN ('tb_usuario','tb_solicitacao_suporte','tb_controle_rpa',
+                           'tb_assinatura','tb_log_acesso','tb_log_auditoria','tb_catalogo_dados') THEN 'ADMIN'
+         WHEN c.tabela IN ('tb_endereco','tb_relatorio') THEN 'GESTOR'
+         WHEN c.tabela='tb_justificativa' AND c.coluna IN ('motivo','descricao') THEN 'GESTOR'
+         ELSE 'OPERADOR'
+       END,
+       (c.tabela='tb_usuario' AND c.coluna='nome')
+       OR c.coluna IN ('descricao','resposta','motivo','assinatura','certificado_titular','user_agent','usuario_bd')
+       OR (c.tabela IN ('tb_solicitacao_suporte','tb_log_acesso','tb_relatorio') AND c.coluna LIKE 'cod\_usuario%' ESCAPE '\')
+FROM colunas c LEFT JOIN descricoes d ON d.coluna=c.coluna
+ON CONFLICT (nome_tabela, nome_coluna) DO NOTHING;
+
+-- Atualiza características físicas e o bloco gerado de constraints/defaults.
+-- Preserva o texto humano e classificações; substitui o bloco em reexecuções.
+UPDATE tb_catalogo_dados m
+SET tipo_dado=pg_catalog.format_type(a.atttypid,a.atttypmod),
+    obrigatorio=a.attnotnull,
+    regra_negocio=split_part(COALESCE(m.regra_negocio,''), E'\n[SCHEMA]', 1)
+      || E'\n[SCHEMA] ' || concat_ws('; ',
+        (SELECT string_agg(k.conname || ': ' || pg_get_constraintdef(k.oid), '; ' ORDER BY k.conname)
+         FROM pg_constraint k WHERE k.conrelid=c.oid AND a.attnum=ANY(k.conkey)),
+        (SELECT 'DEFAULT: ' || pg_get_expr(d.adbin,d.adrelid)
+         FROM pg_attrdef d WHERE d.adrelid=c.oid AND d.adnum=a.attnum)
+      ),
+    chave=CASE
+      WHEN EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid AND k.contype='p' AND a.attnum=ANY(k.conkey)) THEN 'PK'
+      WHEN EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid AND k.contype='f' AND a.attnum=ANY(k.conkey)) THEN 'FK'
+      WHEN EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid AND k.contype='u' AND a.attnum=ANY(k.conkey)) THEN 'NK'
+    END
+FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped
+WHERE n.nspname='public' AND c.relkind IN ('r','p')
+  AND m.nome_tabela=c.relname AND m.nome_coluna=a.attname;
+
+DELETE FROM tb_catalogo_dados m
+WHERE m.nome_tabela LIKE 'tb\_%' ESCAPE '\' AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns c WHERE c.table_schema='public'
+      AND c.table_name=m.nome_tabela AND c.column_name=m.nome_coluna
+);
 
 -- ====================================================================
 -- MONITORAMENTO DAU (DAILY ACTIVE USERS)
@@ -1612,6 +1733,8 @@ ORDER BY data_acesso;
 -- ====================================================================
 -- TRANSFORMAÇÕES ETL: CTEs, WINDOW FUNCTIONS E CTE RECURSIVA
 -- ====================================================================
+
+CREATE OR REPLACE VIEW public.vw_bi_leituras_temperatura AS
 WITH leituras_classificadas AS (
 	SELECT
 		lt.id AS cod_leitura,
@@ -1658,6 +1781,7 @@ SELECT
 FROM leituras_classificadas;
 
 
+CREATE OR REPLACE VIEW public.vw_bi_lotes_ativos_camara AS
 WITH lotes_ativos AS (
 	SELECT
 		l.id AS cod_lote,
@@ -1685,6 +1809,7 @@ SELECT
 FROM lotes_ativos;
 
 
+CREATE OR REPLACE VIEW public.vw_bi_etapas_escalonamento AS
 WITH RECURSIVE etapas_escalonamento AS (
 	SELECT
 		a.id AS cod_alerta,
@@ -1724,65 +1849,24 @@ FROM etapas_escalonamento
 ORDER BY cod_alerta, ordem_etapa;
 
 
--- ====================================================================
--- ÍNDICES E CONSULTAS DE ANÁLISE DE DESEMPENHO
--- ====================================================================
-DROP INDEX IF EXISTS idx_leitura_termometro_data;
-DROP INDEX IF EXISTS idx_alerta_escalonamento;
-DROP INDEX IF EXISTS idx_lote_camara_ativos;
-DROP INDEX IF EXISTS idx_solicitacao_suporte_usuario_abertura;
-DROP INDEX IF EXISTS idx_solicitacao_suporte_responsavel_status;
+-- Indices e consultas de observacao. Nao remove indices existentes.
+-- A comparacao sem/com indices deve ser executada SOMENTE na base descartavel
+-- pelo teste tests/validar_requisitos.py; planos reais ficam na evidencia gerada.
 
-ANALYZE tb_leitura_temperatura;
-ANALYZE tb_alerta;
-ANALYZE tb_lote_camara_frigorifica;
-ANALYZE tb_solicitacao_suporte;
-
--- ================================================================
--- 1. CENÁRIO INICIAL: análise sem os índices
--- ================================================================
-
--- Consulta 1: última leitura de temperatura por termômetro
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT lt.id, lt.temperatura, lt.data_hora
-FROM tb_leitura_temperatura lt
-WHERE lt.cod_termometro = 1
-ORDER BY lt.data_hora DESC, lt.id DESC
-LIMIT 1;
-
--- Consulta 2: alertas ativos aguardando operador/gestor
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT a.id, a.nivel_atual, a.data_hora
-FROM tb_alerta a
-WHERE a.status = 'ATIVO'
-	AND a.nivel_atual IN ('OPERADOR', 'GESTOR')
-ORDER BY a.data_hora;
-
--- Consulta 3: lotes atualmente ativos em uma câmara frigorífica
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT lc.cod_lote, lc.cod_camara_frigorifica
-FROM tb_lote_camara_frigorifica lc
-WHERE lc.cod_camara_frigorifica = 1
-	AND lc.data_saida IS NULL;
-
--- ================================================================
--- 2. ÍNDICES APLICADOS
--- ================================================================
-
-CREATE INDEX idx_leitura_termometro_data
+CREATE INDEX IF NOT EXISTS idx_leitura_termometro_data
 	ON tb_leitura_temperatura (cod_termometro, data_hora DESC, id DESC);
 
-CREATE INDEX idx_alerta_escalonamento
+CREATE INDEX IF NOT EXISTS idx_alerta_escalonamento
 	ON tb_alerta (status, nivel_atual, data_hora);
 
-CREATE INDEX idx_lote_camara_ativos
+CREATE INDEX IF NOT EXISTS idx_lote_camara_ativos
 	ON tb_lote_camara_frigorifica (cod_camara_frigorifica, cod_lote)
 	WHERE data_saida IS NULL;
 
-CREATE INDEX idx_solicitacao_suporte_usuario_abertura
+CREATE INDEX IF NOT EXISTS idx_solicitacao_suporte_usuario_abertura
 	ON tb_solicitacao_suporte (cod_usuario_solicitante, data_hora_abertura DESC);
 
-CREATE INDEX idx_solicitacao_suporte_responsavel_status
+CREATE INDEX IF NOT EXISTS idx_solicitacao_suporte_responsavel_status
 	ON tb_solicitacao_suporte (cod_usuario_responsavel, status);
 
 ANALYZE tb_leitura_temperatura;
@@ -1791,7 +1875,7 @@ ANALYZE tb_lote_camara_frigorifica;
 ANALYZE tb_solicitacao_suporte;
 
 -- ================================================================
--- 3. CENÁRIO OTIMIZADO: análise após os índices
+-- Observação do cenário com os índices disponíveis
 -- ================================================================
 
 -- Consulta 1: última leitura de temperatura por termômetro

@@ -48,6 +48,16 @@ dataload.sql (opcional, depois do deploy)
 
 A camada analítica está descrita em [data-mart.md](data-mart.md). Em banco existente, execute apenas `data-mart.sql` para adicionar as views; não reexecute o deploy destrutivo.
 
+### Atualização dos requisitos em banco existente
+
+`atualizar-requisitos.sql` é a alternativa não destrutiva para adicionar a autoria BD, atualizar as duas funções de auditoria, completar o catálogo e criar as três views de `etl-transformacoes.sql`. Requer o schema atual existente e revisão/backup prévio. Executa em transação; não recria tabelas operacionais. Foi testado somente em ambiente descartável nesta entrega; não foi aplicado aos bancos reais.
+
+`tb_log_auditoria.usuario_bd` recebe `CURRENT_USER` nas novas operações. `cod_usuario` continua recebendo o ator da aplicação via contexto `app.usuario_atual`. O primeiro identifica a role da conexão, não necessariamente a pessoa autenticada. Histórico anterior fica NULL porque a autoria não pode ser reconstruída com segurança. NEW/OLD e TG_OP continuam registrados com os filtros de dados sensíveis existentes.
+
+O catálogo inventaria todas as colunas `public.tb_*`, inclusive suas próprias colunas. Tipos, NOT NULL, PK/FK/UNIQUE, defaults e constraints são extraídos do schema; o bloco `[SCHEMA]` é substituído em reexecuções. `chave` resume PK antes de FK antes de NK; as constraints completas mostram combinações e condições. Níveis e marcações existentes são preservados. Novos campos seguem OPERADOR para dados operacionais, GESTOR para endereços/justificativas/metadados de relatório e ADMIN para usuários, suporte, assinaturas, RPA, logs e metadados técnicos. Essa classificação é documental e não modifica permissões reais.
+
+Ver [normalizacao.md](normalizacao.md), [dau.md](dau.md) e [evidências da validação](evidencias/validacao-requisitos.md). O procedimento reproduzível está em [tests/README.md](../../tests/README.md). `indices.sql` não remove índices; a comparação sem índices acontece exclusivamente na réplica descartável do teste.
+
 Os procedimentos de backup e recuperação de falhas estão em [backup-recuperacao.md](backup-recuperacao.md).
 
 ### Massa de dados
@@ -235,7 +245,7 @@ As vidas úteis de categorias e alertas são armazenadas como `INTERVAL HOUR TO 
 
 Operações de `INSERT`, `UPDATE` e `DELETE` nas tabelas de negócio são registradas em `tb_log_auditoria`: CDs, endereços, usuários, vínculos ADMIN–CD, solicitações de suporte, termômetros, categorias, câmaras, lotes, leituras, alertas, notificações, atendimentos, justificativas, relatórios e assinaturas. A tabela de referência `tb_estado`, o controle técnico de cargas RPA, os logs e o catálogo não são auditados.
 
-Cada registro guarda a operação, a tabela, o ID da entidade, o usuário da aplicação (`cod_usuario`, quando informado), o horário e snapshots anterior/novo conforme a operação.
+Cada registro guarda a operação, a tabela, o ID da entidade, o usuário da aplicação (`cod_usuario`, quando informado), a role da conexão (`usuario_bd`, CURRENT_USER), o horário e snapshots anterior/novo conforme a operação. Na atualização de banco existente, usuario_bd permanece NULL nos registros históricos.
 
 Os snapshots mantêm `username` para facilitar a identificação das alterações e omitem `cpf`, `email`, `senha`, `hash_conteudo`, `conteudo`, `numero_serie`, `carimbo_tempo` e `ip_origem`.
 

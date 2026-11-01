@@ -1,5 +1,21 @@
 # Data Mart PostgreSQL
 
+## Views analíticas com CTEs e janelas
+
+Além das estrelas abaixo, `etl-transformacoes.sql` disponibiliza três views (incluídas no deploy e na atualização não destrutiva). São as consultas existentes transformadas em interfaces reutilizáveis; as fórmulas e filtros foram preservados.
+
+| View | Grão e uso |
+| --- | --- |
+| vw_bi_leituras_temperatura | Uma linha por leitura vinculada a uma câmara; LAG por termômetro, variação em °C, AVG acumulada e ROW_NUMBER da leitura mais recente por câmara |
+| vw_bi_lotes_ativos_camara | Uma linha por vínculo de lote ATIVO, sem data_saida; MIN da vida útil e COUNT dos vínculos por câmara |
+| vw_bi_etapas_escalonamento | Uma linha por etapa até o nível atual do alerta; CTE recursiva OPERADOR 0%, GESTOR 40%, ADMIN 70% |
+
+Para séries, ordenar explicitamente por data_hora e cod_leitura. O LAG e a média acumulada consideram todo o histórico presente na view: um filtro externo de período não redefine a janela. Limites de temperatura e vínculo de termômetro refletem o cadastro atual. A primeira leitura não possui anterior/variação. `ordem_leitura_mais_recente=1` seleciona a última leitura.
+
+Nos lotes, MIN e COUNT se repetem em cada vínculo da câmara: não somar o COUNT repetido; selecionar uma linha por câmara ou agregar com MAX. O COUNT representa vínculos, pois o schema não proíbe vínculos abertos repetidos. A recursiva representa etapas calculadas até o nível atual, não comprova transições históricas realizadas: para isso usar tb_log_escalonamento. Não filtra alertas resolvidos, conforme a consulta original.
+
+As views dimensionais existentes mantêm suas colunas e contratos. Estas três views adicionais não substituem as camadas Bronze/Silver/Gold do Databricks nem aplicam autorização por usuário.
+
 Execute `data-mart.sql` depois de `deploy.sql`, no banco novo. Para um banco já criado, execute somente `data-mart.sql`: ele cria ou atualiza views sem apagar dados. Reexecutar `deploy.sql` recria tabelas e remove dados e views dependentes.
 
 ## Modelagem dimensional
