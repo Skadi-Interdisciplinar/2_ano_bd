@@ -60,7 +60,7 @@ def sync() -> None:
             "camaras": fetch_rows(
                 postgres,
                 """
-                SELECT id, modelo, localizacao, temperatura_min,
+                SELECT id, localizacao, temperatura_min,
                        temperatura_max, cod_cd, cod_termometro
                 FROM tb_camara_frigorifica
                 """,
@@ -71,7 +71,7 @@ def sync() -> None:
             "categorias": fetch_rows(
                 postgres,
                 """
-                SELECT id, nome, temperatura_ideal,
+                SELECT id, nome, temperatura_min, temperatura_max,
                        EXTRACT(EPOCH FROM vida_util_horas) / 3600.0 AS vida_util_horas
                 FROM tb_categoria
                 """,
@@ -154,8 +154,10 @@ def sync() -> None:
                 UNWIND $rows AS row
                 MERGE (n:Categoria {id: row.id})
                 SET n.nome = row.nome,
-                    n.temperatura_ideal = row.temperatura_ideal,
+                    n.temperatura_min = row.temperatura_min,
+                    n.temperatura_max = row.temperatura_max,
                     n.vida_util_horas = row.vida_util_horas
+                REMOVE n.temperatura_ideal
                 """,
                 data["categorias"],
             )
@@ -179,10 +181,10 @@ def sync() -> None:
                 """
                 UNWIND $rows AS row
                 MERGE (n:CamaraFrigorifica {id: row.id})
-                SET n.modelo = row.modelo,
-                    n.localizacao = row.localizacao,
+                SET n.localizacao = row.localizacao,
                     n.temperatura_min = row.temperatura_min,
                     n.temperatura_max = row.temperatura_max
+                REMOVE n.modelo
                 WITH n, row
                 MATCH (cd:CD {id: row.cod_cd})
                 MERGE (cd)-[:POSSUI_CAMARA]->(n)

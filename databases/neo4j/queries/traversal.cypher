@@ -2,7 +2,7 @@
 // PERGUNTA DE NEGÓCIO — TRAVERSAL
 // ============================================================
 // A pergunta busca identificar quais usuários trabalham no mesmo CD de uma
-// câmara que armazena lotes da categoria "Alcatra bovina resfriada" e possui um atendimento
+// câmara que armazena lotes da categoria informada em $categoria_nome e possui um atendimento
 // em aberto.
 //
 // Para responder, é necessário percorrer diferentes partes do grafo:
@@ -15,6 +15,6 @@ MATCH path_categoria = (usuario:Usuario)-[:TRABALHA_NO_CD]->(cd:CD)
     -[:PERTENCE_A_CATEGORIA]->(categoria:Categoria)
 MATCH path_alerta = (camara)-[:GEROU_ALERTA]->(alerta:Alerta)
     -[:POSSUI_ATENDIMENTO]->(atendimento:Atendimento)
-WHERE categoria.nome = 'Alcatra bovina resfriada'
-  AND atendimento.status IN ['pendente', 'em_andamento']
+WHERE categoria.nome = $categoria_nome
+  AND atendimento.status IN ['PENDENTE', 'EM_ANDAMENTO']
 RETURN path_categoria, path_alerta;
