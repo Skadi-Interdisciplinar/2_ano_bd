@@ -18,6 +18,8 @@ Por isso, a carga inicial deve ocorrer antes de existirem registros conflitantes
 
 As colunas extras do legado sem destino equivalente não são copiadas, como `Usuario.cargo` e `Termometro.status`.
 
+Para `SUPER_ADMIN`, o CPF eventualmente preenchido no legado é desconsiderado e gravado como `NULL` no destino, tanto na inserção quanto na atualização. O CPF dos demais perfis continua sendo importado e validado. O banco legado não é alterado.
+
 Para `ADMIN`, o `Usuario.id_cd` do legado é convertido em um vínculo `(cod_admin, cod_cd)` em `tb_admin_cd`; `tb_usuario.cod_cd` recebe `NULL`, como exige o schema novo. O vínculo é inserido na mesma transação, sem duplicação nas reexecuções. Vínculos adicionais já presentes no destino são preservados. Isso não sincroniza todos os relacionamentos da tabela `admin_cd` do legado nem remove vínculos antigos.
 
 O legado precisa possuir `Frigorifico.localizacao`, `Frigorifico.temperatura_min` e `Frigorifico.temperatura_max`. Esses campos são copiados diretamente; se estiverem ausentes ou inválidos, a carga falha sem atualizar o controle de execução. Câmara frigorífica não possui campo de modelo no destino; o modelo do termômetro continua sendo copiado normalmente.

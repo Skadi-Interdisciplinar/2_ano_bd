@@ -229,12 +229,14 @@ def validar_usuario(registro: dict) -> None:
     registro["nivel_acesso"] = nivel
 
     if nivel == "SUPER_ADMIN":
+        # O destino não armazena CPF desse perfil, mesmo que exista no legado.
+        registro["cpf"] = None
         if any(
             registro[campo] is not None
-            for campo in ("cpf", "id_cd", "cod_gestor")
+            for campo in ("id_cd", "cod_gestor")
         ):
             raise ValueError(
-                "Usuário super_admin do legado deve possuir CPF, CD e gestor vazios. "
+                "Usuário super_admin do legado deve possuir CD e gestor vazios. "
                 f"ID: {registro['id_usuario']}."
             )
         return
