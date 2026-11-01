@@ -1,5 +1,11 @@
 # Backup e recuperação do PostgreSQL novo
 
+## Recuperação testada em ambiente descartável
+
+Em 01/11/2026, o runner `tests/validar_requisitos.py` executou pg_dump custom e pg_restore com transação única em outro banco local. Comparou contagens de todas as tabelas públicas, nomes das views, quantidades de constraints, triggers e funções, além de sequências selecionadas e uma gravação com auditoria após a restauração. Resultados e hash do dump estão em [evidencias/validacao-requisitos.md](evidencias/validacao-requisitos.md) e no JSON vinculado.
+
+São dados sintéticos em containers descartáveis. O teste usa `--no-owner --no-privileges` no mesmo servidor local; não comprova restauração de roles globais, grants, conectividade ou acessos em produção. Não foi feito backup nem alteração de banco real. Frequência, retenção, responsável, RPO e RTO continuam pendentes de definição operacional.
+
 ## Escopo e preparação
 
 O backup lógico deve incluir todas as tabelas, dados, sequences, funções, triggers e views do banco `skadi`, incluindo auditoria e `tb_controle_rpa`. Ele não inclui Redis nem MongoDB. Os scripts Git permitem reconstruir a estrutura, mas não substituem um backup dos dados.
