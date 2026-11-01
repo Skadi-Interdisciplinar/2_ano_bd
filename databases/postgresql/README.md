@@ -75,7 +75,7 @@ O Worker usa `WORKER_USER_ID=1000001` como padrão. Caso `.env` ou o ambiente j�
 
 Validação em PostgreSQL 17 descartável, com deploy, constraints e triggers ativos: dataload concluído; 52 usuários e nenhum operador com gestor inválido; 60 chamados; 117 leituras; 22 alertas; 3 atendimentos reconhecidos e resolvidos; 23 relatórios; 15 assinaturas; 605 eventos de acesso. Esses volumes operacionais dependem dos vínculos e status da massa.
 
-Os hashes de senha dos usuários importados são os fornecidos no texto; nenhuma senha foi deduzida. As contas locais mantêm seus hashes anteriores. As assinaturas RSA continuam sendo demonstrações e não usam certificados ICP-Brasil. O `dataload.sql` não limpa nem migra registros existentes: execute-o uma única vez em banco recém-criado. Para testar registros omitidos em destino preparado, use `python rpa/carga_delta.py --completa`; um checkpoint delta existente pode deixar de selecionar registros antigos.
+As 45 contas importadas com nível ADMIN, GESTOR ou OPERADOR usam hashes BCrypt válidos da senha `senha123`. As contas SUPER_ADMIN, incluindo a conta técnica do worker, mantêm seus hashes próprios. As assinaturas RSA continuam sendo demonstrações e não usam certificados ICP-Brasil. O `dataload.sql` não limpa nem migra registros existentes: execute-o uma única vez em banco recém-criado. Para testar registros omitidos em destino preparado, use `python rpa/carga_delta.py --completa`; um checkpoint delta existente pode deixar de selecionar registros antigos.
 
 ---
 
