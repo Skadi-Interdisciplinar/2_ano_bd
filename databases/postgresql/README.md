@@ -31,7 +31,6 @@ Camada relacional do **Skadi**, responsável pelo armazenamento e gerenciamento 
 | `data-mart.sql`               | Views dimensionais para BI (alertas e chamados) |
 | `data-mart.md`                | Grãos, dimensões, métricas e validação do Data Mart |
 | `backup-recuperacao.md`       | Procedimentos de backup lógico e recuperação de falhas |
-| `corrigir-geracao-alerta.sql`  | Atualização isolada da função de geração de alertas em banco existente |
 
 ---
 
@@ -53,23 +52,30 @@ Os procedimentos de backup e recuperação de falhas estão em [backup-recuperac
 
 ### Massa de dados
 
-Para corrigir a tentativa de criar alertas duplicados em banco existente, execute somente `corrigir-geracao-alerta.sql`, sem reexecutar o deploy. A função serializa leituras da mesma câmara e só cria alerta se não existir outro `ATIVO` ou `RECONHECIDO`. Não apaga alertas ou leituras. Mensagens Redis que falharam anteriormente permanecem pendentes: o loop atual do worker lê apenas mensagens novas (`>`), portanto reiniciá-lo não reprocessa essas pendências automaticamente.
+A função `fn_gerar_alerta_por_leitura`, mantida em `triggers.sql` e `deploy.sql`, serializa leituras da mesma câmara e só cria alerta se não existir outro `ATIVO` ou `RECONHECIDO`. Em banco existente, atualize apenas a definição da função necessária; não reexecute o deploy destrutivo. Mensagens Redis que falharam anteriormente permanecem pendentes: o loop atual do worker lê apenas mensagens novas (`>`), portanto reiniciá-lo não reprocessa essas pendências automaticamente.
 
-O `dataload.sql` foi dimensionado para um banco recém-criado e carrega:
+O `dataload.sql` destina-se a um banco recém-criado. Nas tabelas sincronizadas, utiliza o texto do dataload legado fornecido em 31/10/2026, preservando os IDs e adaptando as colunas ao modelo normalizado:
 
-* 27 estados e 20 CDs;
-* 175 endereços;
-* 50 termômetros e 50 câmaras, com vínculo individual;
-* 6 categorias;
-* 267 usuários: a conta técnica `skadi_worker`, 6 SUPER_ADMIN, 20 ADMINs, 40 GESTOREs e 200 OPERADORES; `tb_admin_cd` contém 40 vínculos, com dois CDs por ADMIN;
-* 60 solicitações de suporte: 20 `REGISTRADO`, 20 `EM_ATENDIMENTO` e 20 `ATENDIDO`, distribuídas nas quatro categorias e nos últimos 20 dias. Os chamados em atendimento e atendidos possuem responsáveis SUPER_ADMIN; os atendidos possuem resposta e encerramento, com tempos variados para os gráficos. As mudanças respeitam as transições das triggers;
-* 132 lotes e 132 vínculos com câmaras compatíveis;
-* 150 leituras: 100 normais e 50 fora da faixa. As triggers geram 50 alertas e 50 atendimentos. Para cada alerta, é criada uma notificação para cada operador do CD correspondente, totalizando 500 notificações;
-* 10 alertas reconhecidos, cinco deles resolvidos com justificativas após a normalização da temperatura; um alerta CRITICO também é escalonado para GESTOR;
-* 23 relatórios: um por CD e três adicionais; 15 assinaturas RSA de demonstração;
-* 605 eventos de acesso: cinco explícitos, 100 distribuídos em quatro horas e 500 distribuídos ao longo dos últimos dias.
+* 27 estados de referência;
+* 45 CDs, 45 endereços, 45 termômetros, 45 câmaras, 45 categorias, 45 lotes e 45 vínculos lote/câmara: IDs `1` a `45` do legado;
+* 45 usuários do legado: 10 ADMIN, 10 GESTOR e 25 OPERADOR; níveis em maiúsculo. ADMIN fica com `cod_cd` nulo, conforme o schema novo, e os 45 vínculos disponíveis no texto são mantidos em `tb_admin_cd`;
+* conta técnica `skadi_worker` no ID `1000001` e os seis SUPER_ADMIN locais nos IDs `1000002` a `1000007`, preservando nomes, usernames, e-mails e hashes anteriores;
+* 60 solicitações de suporte: 20 `REGISTRADO`, 20 `EM_ATENDIMENTO` e 20 `ATENDIDO`, usando os usuários presentes;
+* amostras operacionais preservadas, com referências aos novos usuários. Leituras anormais de demonstração só são inseridas para câmaras com lote `ATIVO` ainda presente, pois a trigger exige essa referência. Relatórios e logs usam os usernames do legado.
 
-As contas de teste ADMIN, GESTOR, OPERADOR e `skadi_worker` usam a senha `senha123`; os seis SUPER_ADMIN informados usam `senha_temporaria`. As assinaturas RSA são de demonstração e não usam certificados ICP-Brasil. O `dataload.sql` não limpa registros existentes e deve ser executado uma única vez em banco recém-criado.
+### Registros reservados para testar o RPA
+
+Os IDs `46` a `50` foram omitidos nas oito tabelas sincronizadas. O legado contém esses registros e a carga deve inseri-los, incluindo suas dependências. Os vínculos ADMIN/CD desses CDs também não são criados no dataload, para não gerar referências inexistentes. O RPA atual não sincroniza `admin_cd`.
+
+Depois de uma carga completa compatível com as regras do destino, as oito tabelas devem ter os IDs `1` a `50`; usuários devem totalizar 57, incluindo as sete contas locais. As sequências são ajustadas após os IDs explícitos. A faixa alta de usuários evita colisão com esta massa de 50 registros; não substitui uma estratégia de identidade para crescimento futuro das duas origens.
+
+O RPA converte `Usuario.id_cd` de ADMIN em vínculo em `tb_admin_cd` e grava `tb_usuario.cod_cd` nulo. Vínculos adicionais do destino são preservados; a tabela completa `admin_cd` do legado não é sincronizada.
+
+O Worker usa `WORKER_USER_ID=1000001` como padrão. Caso `.env` ou o ambiente já defina `WORKER_USER_ID`, atualize-o para o ID da conta técnica efetivamente existente. Essa alteração não migra o usuário de um banco em uso.
+
+Validação em PostgreSQL 17 descartável, com deploy, constraints e triggers ativos: dataload concluído; 52 usuários e nenhum operador com gestor inválido; 60 chamados; 117 leituras; 22 alertas; 3 atendimentos reconhecidos e resolvidos; 23 relatórios; 15 assinaturas; 605 eventos de acesso. Esses volumes operacionais dependem dos vínculos e status da massa.
+
+Os hashes de senha dos usuários importados são os fornecidos no texto; nenhuma senha foi deduzida. As contas locais mantêm seus hashes anteriores. As assinaturas RSA continuam sendo demonstrações e não usam certificados ICP-Brasil. O `dataload.sql` não limpa nem migra registros existentes: execute-o uma única vez em banco recém-criado. Para testar registros omitidos em destino preparado, use `python rpa/carga_delta.py --completa`; um checkpoint delta existente pode deixar de selecionar registros antigos.
 
 ---
 

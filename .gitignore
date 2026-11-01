@@ -4,3 +4,9 @@ databases/mongodb/.env
 rpa/.env
 .env
 __pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.log
+.env.*
+!.env.example

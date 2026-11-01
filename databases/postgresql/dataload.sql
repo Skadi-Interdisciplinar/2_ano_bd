@@ -2,6 +2,10 @@
 -- MASSA DE DADOS
 -- =============================
 BEGIN;
+SET LOCAL timezone TO 'America/Sao_Paulo';
+
+-- Dados legados de teste: IDs 1..45; 46..50 ficam para a carga RPA.
+-- Executar uma unica vez em banco novo. Este arquivo nao migra dados existentes.
 
 -- =============================
 -- 1. ESTADOS
@@ -11,168 +15,219 @@ INSERT INTO tb_estado (estado) VALUES
     ('MA'), ('MT'), ('MS'), ('MG'), ('PA'), ('PB'), ('PR'), ('PE'), ('PI'),
     ('RJ'), ('RN'), ('RS'), ('RO'), ('RR'), ('SC'), ('SP'), ('SE'), ('TO');
 
--- =============================
--- 2. CENTROS DE DISTRIBUIÇÃO
--- =============================
-INSERT INTO tb_cd (nome, cnpj) VALUES
-    ('CD JBS', '90000001000129'),
-    ('CD Friboi', '90000002000173'),
-    ('CD Seara', '90000003000118'),
-    ('CD Swift', '90000004000162'),
-    ('CD Marfrig', '90000005000107'),
-    ('CD Minerva Foods', '90000006000151'),
-    ('CD BRF', '90000007000104'),
-    ('CD Aurora Coop', '90000008000140'),
-    ('CD Frimesa', '90000009000195'),
-    ('CD Copacol', '90000010000110'),
-    ('CD Lar Cooperativa', '90000011000164'),
-    ('CD Coopavel', '90000012000109'),
-    ('CD Pamplona Alimentos', '90000013000153'),
-    ('CD Masterboi', '90000014000106'),
-    ('CD Frigol', '90000015000142'),
-    ('CD Frisa', '90000016000197'),
-    ('CD Pif Paf Alimentos', '90000017000131'),
-    ('CD Alegra', '90000018000186'),
-    ('CD Zanchetta', '90000019000120'),
-    ('CD Bello Alimentos', '90000020000155');
 
 -- =============================
--- 3. ENDEREÇOS
+-- 2. CENTROS DE DISTRIBUIÇÃO — MESMOS IDs DO LEGADO
 -- =============================
-INSERT INTO tb_endereco
-    (cep, rua, numero, cidade, bairro, complemento, cod_estado, cod_cd)
-SELECT
-    (10000000 + gs)::VARCHAR(8),
-    'Rua Industrial ' || gs,
-    100 + gs,
-    localidade.cidade,
-    'Centro Industrial',
-    CASE WHEN gs % 3 = 0 THEN 'Galpão ' || gs ELSE NULL END,
-    estado.id,
-    localidade.cod_cd
-FROM generate_series(1, 100) AS gs
-JOIN (VALUES
-    (1, 'São Paulo', 'SP'), (2, 'Rio de Janeiro', 'RJ'),
-    (3, 'Belo Horizonte', 'MG'), (4, 'Curitiba', 'PR'),
-    (5, 'Florianópolis', 'SC')
-) AS localidade(cod_cd, cidade, uf)
-    ON localidade.cod_cd = ((gs - 1) % 5) + 1
-JOIN tb_estado estado ON estado.estado = localidade.uf;
-
-INSERT INTO tb_endereco
-    (cep, rua, numero, cidade, bairro, complemento, cod_estado, cod_cd)
-SELECT
-    (11000000 + gs)::VARCHAR(8),
-    'Avenida de Distribuição ' || gs,
-    100 + gs,
-    localidade.cidade,
-    'Centro Logístico',
-    'Galpão ' || gs,
-    estado.id,
-    localidade.cod_cd
-FROM generate_series(1, 75) AS gs
-JOIN (VALUES
-    (6, 'Porto Alegre', 'RS'), (7, 'Salvador', 'BA'),
-    (8, 'Recife', 'PE'), (9, 'Fortaleza', 'CE'),
-    (10, 'Manaus', 'AM'), (11, 'Belém', 'PA'),
-    (12, 'Goiânia', 'GO'), (13, 'Brasília', 'DF'),
-    (14, 'Vitória', 'ES'), (15, 'Natal', 'RN'),
-    (16, 'João Pessoa', 'PB'), (17, 'Maceió', 'AL'),
-    (18, 'Teresina', 'PI'), (19, 'Campo Grande', 'MS'),
-    (20, 'Cuiabá', 'MT')
-) AS localidade(cod_cd, cidade, uf)
-    ON localidade.cod_cd = 6 + ((gs - 1) / 5)
-JOIN tb_estado estado ON estado.estado = localidade.uf;
+INSERT INTO tb_cd (id, nome, cnpj) VALUES
+    (1, 'CD São Paulo - Unidade 1', '00000000000001'),
+    (2, 'CD Rio de Janeiro - Unidade 2', '00000000000002'),
+    (3, 'CD Belo Horizonte - Unidade 3', '00000000000003'),
+    (4, 'CD Curitiba - Unidade 4', '00000000000004'),
+    (5, 'CD Porto Alegre - Unidade 5', '00000000000005'),
+    (6, 'CD Salvador - Unidade 6', '00000000000006'),
+    (7, 'CD Recife - Unidade 7', '00000000000007'),
+    (8, 'CD Fortaleza - Unidade 8', '00000000000008'),
+    (9, 'CD Brasília - Unidade 9', '00000000000009'),
+    (10, 'CD Manaus - Unidade 10', '00000000000010'),
+    (11, 'CD São Paulo - Unidade 11', '00000000000011'),
+    (12, 'CD Rio de Janeiro - Unidade 12', '00000000000012'),
+    (13, 'CD Belo Horizonte - Unidade 13', '00000000000013'),
+    (14, 'CD Curitiba - Unidade 14', '00000000000014'),
+    (15, 'CD Porto Alegre - Unidade 15', '00000000000015'),
+    (16, 'CD Salvador - Unidade 16', '00000000000016'),
+    (17, 'CD Recife - Unidade 17', '00000000000017'),
+    (18, 'CD Fortaleza - Unidade 18', '00000000000018'),
+    (19, 'CD Brasília - Unidade 19', '00000000000019'),
+    (20, 'CD Manaus - Unidade 20', '00000000000020'),
+    (21, 'CD São Paulo - Unidade 21', '00000000000021'),
+    (22, 'CD Rio de Janeiro - Unidade 22', '00000000000022'),
+    (23, 'CD Belo Horizonte - Unidade 23', '00000000000023'),
+    (24, 'CD Curitiba - Unidade 24', '00000000000024'),
+    (25, 'CD Porto Alegre - Unidade 25', '00000000000025'),
+    (26, 'CD Salvador - Unidade 26', '00000000000026'),
+    (27, 'CD Recife - Unidade 27', '00000000000027'),
+    (28, 'CD Fortaleza - Unidade 28', '00000000000028'),
+    (29, 'CD Brasília - Unidade 29', '00000000000029'),
+    (30, 'CD Manaus - Unidade 30', '00000000000030'),
+    (31, 'CD São Paulo - Unidade 31', '00000000000031'),
+    (32, 'CD Rio de Janeiro - Unidade 32', '00000000000032'),
+    (33, 'CD Belo Horizonte - Unidade 33', '00000000000033'),
+    (34, 'CD Curitiba - Unidade 34', '00000000000034'),
+    (35, 'CD Porto Alegre - Unidade 35', '00000000000035'),
+    (36, 'CD Salvador - Unidade 36', '00000000000036'),
+    (37, 'CD Recife - Unidade 37', '00000000000037'),
+    (38, 'CD Fortaleza - Unidade 38', '00000000000038'),
+    (39, 'CD Brasília - Unidade 39', '00000000000039'),
+    (40, 'CD Manaus - Unidade 40', '00000000000040'),
+    (41, 'CD São Paulo - Unidade 41', '00000000000041'),
+    (42, 'CD Rio de Janeiro - Unidade 42', '00000000000042'),
+    (43, 'CD Belo Horizonte - Unidade 43', '00000000000043'),
+    (44, 'CD Curitiba - Unidade 44', '00000000000044'),
+    (45, 'CD Porto Alegre - Unidade 45', '00000000000045');
 
 -- =============================
--- 4. USUÁRIOS
+-- 3. ENDEREÇOS — UF RESOLVIDA EM tb_estado
 -- =============================
--- O worker deve permanecer com ID 1.
-SELECT set_config('app.usuario_atual', '1', false);
+INSERT INTO tb_endereco (id, cep, rua, numero, cidade, bairro, complemento, cod_estado, cod_cd) VALUES
+    (1, '10000137', 'Rua das Flores', 101, 'São Paulo', 'Zona Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'SP'), 1),
+    (2, '10000274', 'Rua Industrial', 102, 'Rio de Janeiro', 'Distrito Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'RJ'), 2),
+    (3, '10000411', 'Rua Comercial', 103, 'Belo Horizonte', 'Setor Logístico', NULL, (SELECT id FROM tb_estado WHERE estado = 'MG'), 3),
+    (4, '10000548', 'Rua dos Andradas', 104, 'Curitiba', 'Vila Operária', NULL, (SELECT id FROM tb_estado WHERE estado = 'PR'), 4),
+    (5, '10000685', 'Rua Voluntários', 105, 'Porto Alegre', 'Centro', NULL, (SELECT id FROM tb_estado WHERE estado = 'RS'), 5),
+    (6, '10000822', 'Rua Brasil', 106, 'Salvador', 'Zona Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'BA'), 6),
+    (7, '10000959', 'Rua Central', 107, 'Recife', 'Distrito Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'PE'), 7),
+    (8, '10001096', 'Rua Norte', 108, 'Fortaleza', 'Setor Logístico', NULL, (SELECT id FROM tb_estado WHERE estado = 'CE'), 8),
+    (9, '10001233', 'Rua Sul', 109, 'Brasília', 'Vila Operária', NULL, (SELECT id FROM tb_estado WHERE estado = 'DF'), 9),
+    (10, '10001370', 'Rua das Nações', 110, 'Manaus', 'Centro', NULL, (SELECT id FROM tb_estado WHERE estado = 'AM'), 10),
+    (11, '10001507', 'Rua das Flores', 111, 'São Paulo', 'Zona Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'SP'), 11),
+    (12, '10001644', 'Rua Industrial', 112, 'Rio de Janeiro', 'Distrito Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'RJ'), 12),
+    (13, '10001781', 'Rua Comercial', 113, 'Belo Horizonte', 'Setor Logístico', NULL, (SELECT id FROM tb_estado WHERE estado = 'MG'), 13),
+    (14, '10001918', 'Rua dos Andradas', 114, 'Curitiba', 'Vila Operária', NULL, (SELECT id FROM tb_estado WHERE estado = 'PR'), 14),
+    (15, '10002055', 'Rua Voluntários', 115, 'Porto Alegre', 'Centro', NULL, (SELECT id FROM tb_estado WHERE estado = 'RS'), 15),
+    (16, '10002192', 'Rua Brasil', 116, 'Salvador', 'Zona Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'BA'), 16),
+    (17, '10002329', 'Rua Central', 117, 'Recife', 'Distrito Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'PE'), 17),
+    (18, '10002466', 'Rua Norte', 118, 'Fortaleza', 'Setor Logístico', NULL, (SELECT id FROM tb_estado WHERE estado = 'CE'), 18),
+    (19, '10002603', 'Rua Sul', 119, 'Brasília', 'Vila Operária', NULL, (SELECT id FROM tb_estado WHERE estado = 'DF'), 19),
+    (20, '10002740', 'Rua das Nações', 120, 'Manaus', 'Centro', NULL, (SELECT id FROM tb_estado WHERE estado = 'AM'), 20),
+    (21, '10002877', 'Rua das Flores', 121, 'São Paulo', 'Zona Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'SP'), 21),
+    (22, '10003014', 'Rua Industrial', 122, 'Rio de Janeiro', 'Distrito Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'RJ'), 22),
+    (23, '10003151', 'Rua Comercial', 123, 'Belo Horizonte', 'Setor Logístico', NULL, (SELECT id FROM tb_estado WHERE estado = 'MG'), 23),
+    (24, '10003288', 'Rua dos Andradas', 124, 'Curitiba', 'Vila Operária', NULL, (SELECT id FROM tb_estado WHERE estado = 'PR'), 24),
+    (25, '10003425', 'Rua Voluntários', 125, 'Porto Alegre', 'Centro', NULL, (SELECT id FROM tb_estado WHERE estado = 'RS'), 25),
+    (26, '10003562', 'Rua Brasil', 126, 'Salvador', 'Zona Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'BA'), 26),
+    (27, '10003699', 'Rua Central', 127, 'Recife', 'Distrito Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'PE'), 27),
+    (28, '10003836', 'Rua Norte', 128, 'Fortaleza', 'Setor Logístico', NULL, (SELECT id FROM tb_estado WHERE estado = 'CE'), 28),
+    (29, '10003973', 'Rua Sul', 129, 'Brasília', 'Vila Operária', NULL, (SELECT id FROM tb_estado WHERE estado = 'DF'), 29),
+    (30, '10004110', 'Rua das Nações', 130, 'Manaus', 'Centro', NULL, (SELECT id FROM tb_estado WHERE estado = 'AM'), 30),
+    (31, '10004247', 'Rua das Flores', 131, 'São Paulo', 'Zona Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'SP'), 31),
+    (32, '10004384', 'Rua Industrial', 132, 'Rio de Janeiro', 'Distrito Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'RJ'), 32),
+    (33, '10004521', 'Rua Comercial', 133, 'Belo Horizonte', 'Setor Logístico', NULL, (SELECT id FROM tb_estado WHERE estado = 'MG'), 33),
+    (34, '10004658', 'Rua dos Andradas', 134, 'Curitiba', 'Vila Operária', NULL, (SELECT id FROM tb_estado WHERE estado = 'PR'), 34),
+    (35, '10004795', 'Rua Voluntários', 135, 'Porto Alegre', 'Centro', NULL, (SELECT id FROM tb_estado WHERE estado = 'RS'), 35),
+    (36, '10004932', 'Rua Brasil', 136, 'Salvador', 'Zona Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'BA'), 36),
+    (37, '10005069', 'Rua Central', 137, 'Recife', 'Distrito Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'PE'), 37),
+    (38, '10005206', 'Rua Norte', 138, 'Fortaleza', 'Setor Logístico', NULL, (SELECT id FROM tb_estado WHERE estado = 'CE'), 38),
+    (39, '10005343', 'Rua Sul', 139, 'Brasília', 'Vila Operária', NULL, (SELECT id FROM tb_estado WHERE estado = 'DF'), 39),
+    (40, '10005480', 'Rua das Nações', 140, 'Manaus', 'Centro', NULL, (SELECT id FROM tb_estado WHERE estado = 'AM'), 40),
+    (41, '10005617', 'Rua das Flores', 141, 'São Paulo', 'Zona Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'SP'), 41),
+    (42, '10005754', 'Rua Industrial', 142, 'Rio de Janeiro', 'Distrito Industrial', NULL, (SELECT id FROM tb_estado WHERE estado = 'RJ'), 42),
+    (43, '10005891', 'Rua Comercial', 143, 'Belo Horizonte', 'Setor Logístico', NULL, (SELECT id FROM tb_estado WHERE estado = 'MG'), 43),
+    (44, '10006028', 'Rua dos Andradas', 144, 'Curitiba', 'Vila Operária', NULL, (SELECT id FROM tb_estado WHERE estado = 'PR'), 44),
+    (45, '10006165', 'Rua Voluntários', 145, 'Porto Alegre', 'Centro', NULL, (SELECT id FROM tb_estado WHERE estado = 'RS'), 45);
 
-INSERT INTO tb_usuario
-    (nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor)
-VALUES
-    ('Worker Skadi', 'skadi_worker', NULL, 'skadi.enterprise@gmail.com',
-     '$2a$12$HZ7dYoDeadUb.jpyhXV63uEH2PN525cWcV0dNEt5I3J1uuFQ02Sge',
-     'SUPER_ADMIN', NULL, NULL);
+-- =============================
+-- 4. USUÁRIOS — IDs DO LEGADO E CONTAS LOCAIS SEPARADAS
+-- =============================
+-- Limpa o contexto antes de criar a conta tecnica usada pela auditoria.
+SELECT set_config('app.usuario_atual', '', true);
+INSERT INTO tb_usuario (id, nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor) VALUES
+    (1000001, 'Worker Skadi', 'skadi_worker', NULL, 'skadi.enterprise@gmail.com', '$2a$12$HZ7dYoDeadUb.jpyhXV63uEH2PN525cWcV0dNEt5I3J1uuFQ02Sge', 'SUPER_ADMIN', NULL, NULL);
+SELECT set_config('app.usuario_atual', '1000001', true);
 
-INSERT INTO tb_usuario
-    (nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor)
-VALUES
-    ('Beatriz Hinsching', 'beatriz.hinsching', NULL, 'beatriz.carvalho@institutojef.org.br',
-     '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
-    ('Diego Valadares', 'diego.valadares', NULL, 'diego.valadares@institutojef.org.br',
-     '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
-    ('Enzo Nascimento', 'enzo.nascimento', NULL, 'enzo.nascimento@institutojef.org.br',
-     '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
-    ('Giovanna Santos', 'giovanna.santos', NULL, 'giovanna.santos@institutojef.org.br',
-     '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
-    ('Gustavo Munhoz', 'gustavo.munhoz', NULL, 'gustavo.munhoz@institutojef.org.br',
-     '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
-    ('Mariana Proque', 'mariana.proque', NULL, 'mariana.proque@institutojef.org.br',
-     '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL);
+INSERT INTO tb_usuario (id, nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor) VALUES
+    (1000002, 'Beatriz Hinsching', 'beatriz.hinsching', NULL, 'beatriz.carvalho@institutojef.org.br', '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
+    (1000003, 'Diego Valadares', 'diego.valadares', NULL, 'diego.valadares@institutojef.org.br', '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
+    (1000004, 'Enzo Nascimento', 'enzo.nascimento', NULL, 'enzo.nascimento@institutojef.org.br', '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
+    (1000005, 'Giovanna Santos', 'giovanna.santos', NULL, 'giovanna.santos@institutojef.org.br', '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
+    (1000006, 'Gustavo Munhoz', 'gustavo.munhoz', NULL, 'gustavo.munhoz@institutojef.org.br', '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL),
+    (1000007, 'Mariana Proque', 'mariana.proque', NULL, 'mariana.proque@institutojef.org.br', '$2a$12$j3weiXa7rwLd16llFhTHruukeZNfl8Ekp/pNJcYZfoOOAGLYlFhRm', 'SUPER_ADMIN', NULL, NULL);
 
-ALTER TABLE tb_usuario DISABLE TRIGGER trg_auditoria_usuario;
-INSERT INTO tb_usuario
-    (nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor)
-SELECT
-    'Administrador do CD ' || LPAD(cd.id::TEXT, 2, '0'),
-    'admin' || LPAD(cd.id::TEXT, 3, '0'),
-    LPAD((20000000000 + cd.id)::TEXT, 11, '0'),
-    'admin.cd' || LPAD(cd.id::TEXT, 2, '0') || '@skadi.example',
-    '$2a$12$HZ7dYoDeadUb.jpyhXV63uEH2PN525cWcV0dNEt5I3J1uuFQ02Sge',
-    'ADMIN', NULL, NULL
-FROM tb_cd cd
-ORDER BY cd.id;
+-- ADMIN usa tb_admin_cd; seu cod_cd direto deve ser NULL no modelo novo.
+INSERT INTO tb_usuario (id, nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor) VALUES
+    (1, 'Ana Souza', 'usuario1', '00000000001', 'usuario1@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (2, 'Carlos Lima', 'usuario2', '00000000002', 'usuario2@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (3, 'Fernanda Ribeiro', 'usuario3', '00000000003', 'usuario3@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (4, 'João Almeida', 'usuario4', '00000000004', 'usuario4@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (5, 'Mariana Nunes', 'usuario5', '00000000005', 'usuario5@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (6, 'Rafael Dias', 'usuario6', '00000000006', 'usuario6@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (7, 'Beatriz Costa', 'usuario7', '00000000007', 'usuario7@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (8, 'Eduardo Pereira', 'usuario8', '00000000008', 'usuario8@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (9, 'Camila Santos', 'usuario9', '00000000009', 'usuario9@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (10, 'Lucas Oliveira', 'usuario10', '00000000010', 'usuario10@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'ADMIN', NULL, NULL),
+    (11, 'Patrícia Barbosa', 'usuario11', '00000000011', 'usuario11@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 11, NULL),
+    (12, 'Rodrigo Cardoso', 'usuario12', '00000000012', 'usuario12@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 12, NULL),
+    (13, 'Juliana Teixeira', 'usuario13', '00000000013', 'usuario13@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 13, NULL),
+    (14, 'Marcos Rocha', 'usuario14', '00000000014', 'usuario14@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 14, NULL),
+    (15, 'Larissa Martins', 'usuario15', '00000000015', 'usuario15@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 15, NULL),
+    (16, 'Gustavo Souza', 'usuario16', '00000000016', 'usuario16@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 16, NULL),
+    (17, 'Vanessa Lima', 'usuario17', '00000000017', 'usuario17@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 17, NULL),
+    (18, 'Thiago Ribeiro', 'usuario18', '00000000018', 'usuario18@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 18, NULL),
+    (19, 'Renata Almeida', 'usuario19', '00000000019', 'usuario19@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 19, NULL),
+    (20, 'Bruno Nunes', 'usuario20', '00000000020', 'usuario20@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'GESTOR', 20, NULL),
+    (21, 'Ana Dias', 'usuario21', '00000000021', 'usuario21@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 11, 11),
+    (22, 'Carlos Costa', 'usuario22', '00000000022', 'usuario22@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 12, 12),
+    (23, 'Fernanda Pereira', 'usuario23', '00000000023', 'usuario23@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 13, 13),
+    (24, 'João Santos', 'usuario24', '00000000024', 'usuario24@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 14, 14),
+    (25, 'Mariana Oliveira', 'usuario25', '00000000025', 'usuario25@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 15, 15),
+    (26, 'Rafael Barbosa', 'usuario26', '00000000026', 'usuario26@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 16, 16),
+    (27, 'Beatriz Cardoso', 'usuario27', '00000000027', 'usuario27@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 17, 17),
+    (28, 'Eduardo Teixeira', 'usuario28', '00000000028', 'usuario28@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 18, 18),
+    (29, 'Camila Rocha', 'usuario29', '00000000029', 'usuario29@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 19, 19),
+    (30, 'Lucas Martins', 'usuario30', '00000000030', 'usuario30@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 20, 20),
+    (31, 'Patrícia Souza', 'usuario31', '00000000031', 'usuario31@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 11, 11),
+    (32, 'Rodrigo Lima', 'usuario32', '00000000032', 'usuario32@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 12, 12),
+    (33, 'Juliana Ribeiro', 'usuario33', '00000000033', 'usuario33@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 13, 13),
+    (34, 'Marcos Almeida', 'usuario34', '00000000034', 'usuario34@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 14, 14),
+    (35, 'Larissa Nunes', 'usuario35', '00000000035', 'usuario35@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 15, 15),
+    (36, 'Gustavo Dias', 'usuario36', '00000000036', 'usuario36@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 16, 16),
+    (37, 'Vanessa Costa', 'usuario37', '00000000037', 'usuario37@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 17, 17),
+    (38, 'Thiago Pereira', 'usuario38', '00000000038', 'usuario38@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 18, 18),
+    (39, 'Renata Santos', 'usuario39', '00000000039', 'usuario39@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 19, 19),
+    (40, 'Bruno Oliveira', 'usuario40', '00000000040', 'usuario40@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 20, 20),
+    (41, 'Ana Barbosa', 'usuario41', '00000000041', 'usuario41@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 11, 11),
+    (42, 'Carlos Cardoso', 'usuario42', '00000000042', 'usuario42@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 12, 12),
+    (43, 'Fernanda Teixeira', 'usuario43', '00000000043', 'usuario43@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 13, 13),
+    (44, 'João Rocha', 'usuario44', '00000000044', 'usuario44@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 14, 14),
+    (45, 'Mariana Martins', 'usuario45', '00000000045', 'usuario45@logfresh.com', '$2b$10$KIXq3nPZ0fQe7uYwR1sT8eJ4vXhLmN2oPa6bCdE9fGhIjKlMnOpQr', 'OPERADOR', 15, 15);
 
-INSERT INTO tb_admin_cd (cod_admin, cod_cd)
-SELECT admin.id, cd.id
-FROM tb_cd cd
-JOIN tb_usuario admin
-    ON admin.username = 'admin' || LPAD(cd.id::TEXT, 3, '0')
-UNION
-SELECT admin.id, outro_cd.id
-FROM tb_cd cd
-JOIN tb_usuario admin
-    ON admin.username = 'admin' || LPAD(cd.id::TEXT, 3, '0')
-JOIN tb_cd outro_cd
-    ON outro_cd.id = CASE WHEN cd.id = (SELECT MAX(id) FROM tb_cd) THEN 1 ELSE cd.id + 1 END;
-
-INSERT INTO tb_usuario
-    (nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor)
-SELECT
-    'Gestor ' || LPAD(((cd.id - 1) * 2 + sufixo.ordem)::TEXT, 3, '0'),
-    'gestor' || LPAD(((cd.id - 1) * 2 + sufixo.ordem)::TEXT, 3, '0'),
-    LPAD((30000000000 + (cd.id * 10) + sufixo.ordem)::TEXT, 11, '0'),
-    'gestor' || LPAD(((cd.id - 1) * 2 + sufixo.ordem)::TEXT, 3, '0') || '@skadi.example',
-    '$2a$12$HZ7dYoDeadUb.jpyhXV63uEH2PN525cWcV0dNEt5I3J1uuFQ02Sge',
-    'GESTOR', cd.id, NULL
-FROM tb_cd cd
-CROSS JOIN (VALUES (1), (2)) AS sufixo(ordem)
-ORDER BY cd.id, sufixo.ordem;
-
-INSERT INTO tb_usuario
-    (nome, username, cpf, email, senha, nivel_acesso, cod_cd, cod_gestor)
-SELECT
-    'Operador ' || LPAD(((cd.id - 1) * 10 + numero_operador)::TEXT, 3, '0'),
-    'operador' || LPAD(((cd.id - 1) * 10 + numero_operador)::TEXT, 3, '0'),
-    LPAD((40000000000 + (cd.id * 100) + numero_operador)::TEXT, 11, '0'),
-    'operador' || LPAD(((cd.id - 1) * 10 + numero_operador)::TEXT, 3, '0') || '@skadi.example',
-    '$2a$12$HZ7dYoDeadUb.jpyhXV63uEH2PN525cWcV0dNEt5I3J1uuFQ02Sge',
-    'OPERADOR', cd.id,
-    gestor.id
-FROM tb_cd cd
-CROSS JOIN generate_series(1, 10) AS serie(numero_operador)
-JOIN tb_usuario gestor
-    ON gestor.username = 'gestor' || LPAD(
-        ((cd.id - 1) * 2 + CASE WHEN numero_operador % 2 = 1 THEN 1 ELSE 2 END)::TEXT,
-        3,
-        '0'
-    )
-ORDER BY cd.id, numero_operador;
-
-ALTER TABLE tb_usuario ENABLE TRIGGER trg_auditoria_usuario;
+-- Vinculos de ADMIN adaptados do texto legado para os CDs presentes.
+INSERT INTO tb_admin_cd (cod_admin, cod_cd) VALUES
+    (1, 1),
+    (2, 2),
+    (3, 3),
+    (4, 4),
+    (5, 5),
+    (6, 6),
+    (7, 7),
+    (8, 8),
+    (9, 9),
+    (10, 10),
+    (1, 11),
+    (2, 12),
+    (3, 13),
+    (4, 14),
+    (5, 15),
+    (6, 16),
+    (7, 17),
+    (8, 18),
+    (9, 19),
+    (10, 20),
+    (1, 21),
+    (2, 22),
+    (3, 23),
+    (4, 24),
+    (5, 25),
+    (6, 26),
+    (7, 27),
+    (8, 28),
+    (9, 29),
+    (10, 30),
+    (1, 31),
+    (2, 32),
+    (3, 33),
+    (4, 34),
+    (5, 35),
+    (6, 36),
+    (7, 37),
+    (8, 38),
+    (9, 39),
+    (10, 40),
+    (1, 41),
+    (2, 42),
+    (3, 43),
+    (4, 44),
+    (5, 45);
 
 -- =============================
 -- 5. SOLICITAÇÕES DE SUPORTE
@@ -237,131 +292,263 @@ END;
 $$;
 
 -- =============================
--- 6. TERMÔMETROS
--- =============================
-INSERT INTO tb_termometro (modelo)
-SELECT
-    CASE gs % 3
-        WHEN 0 THEN 'ThermoTrack T-300'
-        WHEN 1 THEN 'SensorTemp ST-200'
-        ELSE 'ColdMonitor CM-100'
-    END || '-' || LPAD(gs::TEXT, 3, '0')
-FROM generate_series(1, 50) AS gs;
 
 -- =============================
--- 7. CATEGORIAS
+-- 6. TERMÔMETROS — MESMOS IDs DO LEGADO
 -- =============================
-INSERT INTO tb_categoria
-    (nome, temperatura_min, temperatura_max, vida_util_horas)
-VALUES
-    ('Alcatra bovina resfriada', 3.00, 4.50, INTERVAL '240:00' HOUR TO MINUTE),
-    ('Contrafilé bovino resfriado', 2.00, 6.00, INTERVAL '216:00' HOUR TO MINUTE),
-    ('Lombo suíno resfriado', 3.00, 4.50, INTERVAL '168:00' HOUR TO MINUTE),
-    ('Peito de frango resfriado', 3.00, 4.50, INTERVAL '120:00' HOUR TO MINUTE),
-    ('Filé de tilápia fresco', -2.00, 2.00, INTERVAL '72:00' HOUR TO MINUTE),
-    ('Filé de salmão congelado', -22.00, -16.00, INTERVAL '720:00' HOUR TO MINUTE);
+INSERT INTO tb_termometro (id, modelo) VALUES
+    (1, 'Sensor DHT-2200'),
+    (2, 'Sensor TempLog X3'),
+    (3, 'Sensor TermoSense Pro'),
+    (4, 'Sensor IoT-Cold'),
+    (5, 'Sensor ThermoGuard'),
+    (6, 'Sensor DHT-2200'),
+    (7, 'Sensor TempLog X3'),
+    (8, 'Sensor TermoSense Pro'),
+    (9, 'Sensor IoT-Cold'),
+    (10, 'Sensor ThermoGuard'),
+    (11, 'Sensor DHT-2200'),
+    (12, 'Sensor TempLog X3'),
+    (13, 'Sensor TermoSense Pro'),
+    (14, 'Sensor IoT-Cold'),
+    (15, 'Sensor ThermoGuard'),
+    (16, 'Sensor DHT-2200'),
+    (17, 'Sensor TempLog X3'),
+    (18, 'Sensor TermoSense Pro'),
+    (19, 'Sensor IoT-Cold'),
+    (20, 'Sensor ThermoGuard'),
+    (21, 'Sensor DHT-2200'),
+    (22, 'Sensor TempLog X3'),
+    (23, 'Sensor TermoSense Pro'),
+    (24, 'Sensor IoT-Cold'),
+    (25, 'Sensor ThermoGuard'),
+    (26, 'Sensor DHT-2200'),
+    (27, 'Sensor TempLog X3'),
+    (28, 'Sensor TermoSense Pro'),
+    (29, 'Sensor IoT-Cold'),
+    (30, 'Sensor ThermoGuard'),
+    (31, 'Sensor DHT-2200'),
+    (32, 'Sensor TempLog X3'),
+    (33, 'Sensor TermoSense Pro'),
+    (34, 'Sensor IoT-Cold'),
+    (35, 'Sensor ThermoGuard'),
+    (36, 'Sensor DHT-2200'),
+    (37, 'Sensor TempLog X3'),
+    (38, 'Sensor TermoSense Pro'),
+    (39, 'Sensor IoT-Cold'),
+    (40, 'Sensor ThermoGuard'),
+    (41, 'Sensor DHT-2200'),
+    (42, 'Sensor TempLog X3'),
+    (43, 'Sensor TermoSense Pro'),
+    (44, 'Sensor IoT-Cold'),
+    (45, 'Sensor ThermoGuard');
 
 -- =============================
--- 8. CÂMARAS FRIGORÍFICAS
+-- 7. CATEGORIAS — FAIXAS E VIDA ÚTIL DO LEGADO
 -- =============================
-INSERT INTO tb_camara_frigorifica
-    (localizacao, temperatura_min, temperatura_max, cod_cd, cod_termometro)
-VALUES
-    ('Setor Carnes - Câmara 01', 3.00, 4.50, 1, 1),
-    ('Setor Carnes - Câmara 02', 2.00, 6.00, 1, 2),
-    ('Setor Carnes - Câmara 03', 2.00, 6.00, 2, 3),
-    ('Setor Carnes - Câmara 04', 2.00, 6.00, 2, 4),
-    ('Setor Carnes - Câmara 05', 2.00, 6.00, 3, 5),
-    ('Setor Carnes - Câmara 06', 2.00, 6.00, 3, 6),
-    ('Setor Pescados - Câmara 01', -2.00, 2.00, 4, 7),
-    ('Setor Pescados - Câmara 02', -2.00, 2.00, 4, 8),
-    ('Setor Pescados - Câmara 03', -2.00, 2.00, 5, 9),
-    ('Setor Congelados - Câmara 01', -22.00, -16.00, 1, 10),
-    ('Setor Congelados - Câmara 02', -22.00, -16.00, 2, 11),
-    ('Setor Congelados - Câmara 03', -22.00, -16.00, 3, 12);
-
-INSERT INTO tb_camara_frigorifica
-    (localizacao, temperatura_min, temperatura_max, cod_cd, cod_termometro)
-SELECT
-    CASE WHEN gs <= 20 THEN 'Setor Carnes - Câmara '
-         WHEN gs <= 35 THEN 'Setor Pescados - Câmara '
-         ELSE 'Setor Congelados - Câmara ' END || LPAD(gs::TEXT, 2, '0'),
-    CASE WHEN gs <= 20 THEN 2.00 WHEN gs <= 35 THEN -2.00 ELSE -22.00 END,
-    CASE WHEN gs <= 20 THEN 6.00 WHEN gs <= 35 THEN 2.00 ELSE -16.00 END,
-    6 + ((gs - 13) % 15),
-    gs
-FROM generate_series(13, 50) gs
-ORDER BY gs;
+INSERT INTO tb_categoria (id, nome, temperatura_min, temperatura_max, vida_util_horas) VALUES
+    (1, 'Picanha Bovina Premium Congelado', -25.00, -18.00, INTERVAL '3 hours 12 minutes'),
+    (2, 'Alcatra Bovina Premium Resfriado', 0.00, 4.00, INTERVAL '0 hours 55 minutes'),
+    (3, 'Maminha Bovina Premium Congelado', -25.00, -18.00, INTERVAL '2 hours 20 minutes'),
+    (4, 'Patinho Bovino Premium Resfriado', 0.00, 4.00, INTERVAL '1 hours 0 minutes'),
+    (5, 'Fraldinha Bovina Premium Congelado', -25.00, -18.00, INTERVAL '3 hours 24 minutes'),
+    (6, 'Contra Filé Bovino Premium Resfriado', 0.00, 4.00, INTERVAL '0 hours 58 minutes'),
+    (7, 'Coxão Mole Bovino Premium Congelado', -25.00, -18.00, INTERVAL '3 hours 33 minutes'),
+    (8, 'Acém Bovino Premium Resfriado', 0.00, 4.00, INTERVAL '1 hours 5 minutes'),
+    (9, 'Peito de Frango Premium Congelado', -25.00, -18.00, INTERVAL '2 hours 15 minutes'),
+    (10, 'Sobrecoxa de Frango Premium Resfriado', 0.00, 4.00, INTERVAL '0 hours 37 minutes'),
+    (11, 'Picanha Bovina Standard Congelado', -25.00, -18.00, INTERVAL '3 hours 15 minutes'),
+    (12, 'Alcatra Bovina Standard Resfriado', 0.00, 4.00, INTERVAL '0 hours 54 minutes'),
+    (13, 'Maminha Bovina Standard Congelado', -25.00, -18.00, INTERVAL '2 hours 24 minutes'),
+    (14, 'Patinho Bovino Standard Resfriado', 0.00, 4.00, INTERVAL '1 hours 1 minutes'),
+    (15, 'Fraldinha Bovina Standard Congelado', -25.00, -18.00, INTERVAL '3 hours 27 minutes'),
+    (16, 'Contra Filé Bovino Standard Resfriado', 0.00, 4.00, INTERVAL '0 hours 56 minutes'),
+    (17, 'Coxão Mole Bovino Standard Congelado', -25.00, -18.00, INTERVAL '3 hours 30 minutes'),
+    (18, 'Acém Bovino Standard Resfriado', 0.00, 4.00, INTERVAL '1 hours 4 minutes'),
+    (19, 'Peito de Frango Standard Congelado', -25.00, -18.00, INTERVAL '2 hours 19 minutes'),
+    (20, 'Sobrecoxa de Frango Standard Resfriado', 0.00, 4.00, INTERVAL '0 hours 35 minutes'),
+    (21, 'Picanha Bovina Econômica Congelado', -25.00, -18.00, INTERVAL '3 hours 18 minutes'),
+    (22, 'Alcatra Bovina Econômica Resfriado', 0.00, 4.00, INTERVAL '0 hours 59 minutes'),
+    (23, 'Maminha Bovina Econômica Congelado', -25.00, -18.00, INTERVAL '2 hours 26 minutes'),
+    (24, 'Patinho Bovino Econômica Resfriado', 0.00, 4.00, INTERVAL '1 hours 2 minutes'),
+    (25, 'Fraldinha Bovina Econômica Congelado', -25.00, -18.00, INTERVAL '3 hours 36 minutes'),
+    (26, 'Contra Filé Bovino Econômica Resfriado', 0.00, 4.00, INTERVAL '0 hours 57 minutes'),
+    (27, 'Coxão Mole Bovino Econômica Congelado', -25.00, -18.00, INTERVAL '3 hours 39 minutes'),
+    (28, 'Acém Bovino Econômica Resfriado', 0.00, 4.00, INTERVAL '1 hours 6 minutes'),
+    (29, 'Peito de Frango Econômica Congelado', -25.00, -18.00, INTERVAL '2 hours 17 minutes'),
+    (30, 'Sobrecoxa de Frango Econômica Resfriado', 0.00, 4.00, INTERVAL '0 hours 36 minutes'),
+    (31, 'Picanha Bovina Especial Congelado', -25.00, -18.00, INTERVAL '3 hours 21 minutes'),
+    (32, 'Alcatra Bovina Especial Resfriado', 0.00, 4.00, INTERVAL '0 hours 34 minutes'),
+    (33, 'Maminha Bovina Especial Congelado', -25.00, -18.00, INTERVAL '2 hours 28 minutes'),
+    (34, 'Patinho Bovino Especial Resfriado', 0.00, 4.00, INTERVAL '1 hours 3 minutes'),
+    (35, 'Fraldinha Bovina Especial Congelado', -25.00, -18.00, INTERVAL '3 hours 45 minutes'),
+    (36, 'Contra Filé Bovino Especial Resfriado', 0.00, 4.00, INTERVAL '0 hours 56 minutes'),
+    (37, 'Coxão Mole Bovino Especial Congelado', -25.00, -18.00, INTERVAL '3 hours 42 minutes'),
+    (38, 'Acém Bovino Especial Resfriado', 0.00, 4.00, INTERVAL '1 hours 7 minutes'),
+    (39, 'Peito de Frango Especial Congelado', -25.00, -18.00, INTERVAL '2 hours 20 minutes'),
+    (40, 'Sobrecoxa de Frango Especial Resfriado', 0.00, 4.00, INTERVAL '0 hours 38 minutes'),
+    (41, 'Picanha Bovina Básica Congelado', -25.00, -18.00, INTERVAL '3 hours 48 minutes'),
+    (42, 'Alcatra Bovina Básica Resfriado', 0.00, 4.00, INTERVAL '0 hours 33 minutes'),
+    (43, 'Maminha Bovina Básica Congelado', -25.00, -18.00, INTERVAL '2 hours 31 minutes'),
+    (44, 'Patinho Bovino Básica Resfriado', 0.00, 4.00, INTERVAL '1 hours 8 minutes'),
+    (45, 'Fraldinha Bovina Básica Congelado', -25.00, -18.00, INTERVAL '3 hours 51 minutes');
 
 -- =============================
--- 9. LOTES E VÍNCULOS COM CÂMARAS
+-- 8. CÂMARAS FRIGORÍFICAS — MESMOS IDs DO LEGADO
 -- =============================
-INSERT INTO tb_lote (codigo_lote, cod_categoria, data_fabricacao, data_validade)
-VALUES
-    ('LOTE-2026-0001', 1, '2026-08-20', '2026-09-08'),
-    ('LOTE-2026-0002', 2, '2026-08-21', '2026-09-09'),
-    ('LOTE-2026-0003', 3, '2026-08-22', '2026-09-07'),
-    ('LOTE-2026-0004', 4, '2026-08-23', '2026-09-06'),
-    ('LOTE-2026-0005', 1, '2026-08-20', '2026-09-08'),
-    ('LOTE-2026-0006', 2, '2026-08-21', '2026-09-09'),
-    ('LOTE-2026-0007', 5, '2026-08-25', '2026-09-05'),
-    ('LOTE-2026-0008', 5, '2026-08-26', '2026-09-06'),
-    ('LOTE-2026-0009', 5, '2026-08-27', '2026-09-07'),
-    ('LOTE-2026-0010', 6, '2026-08-01', '2027-08-01'),
-    ('LOTE-2026-0011', 6, '2026-08-02', '2027-08-02'),
-    ('LOTE-2026-0012', 6, '2026-08-03', '2027-08-03');
+INSERT INTO tb_camara_frigorifica (id, localizacao, temperatura_min, temperatura_max, cod_cd, cod_termometro) VALUES
+    (1, 'Setor A - Corredor 1', -25.00, -18.00, 1, 1),
+    (2, 'Setor B - Corredor 2', 0.00, 4.00, 2, 2),
+    (3, 'Setor C - Corredor 3', -25.00, -18.00, 3, 3),
+    (4, 'Setor D - Corredor 4', 0.00, 4.00, 4, 4),
+    (5, 'Setor A - Corredor 5', -25.00, -18.00, 5, 5),
+    (6, 'Setor B - Corredor 6', 0.00, 4.00, 6, 6),
+    (7, 'Setor C - Corredor 1', -25.00, -18.00, 7, 7),
+    (8, 'Setor D - Corredor 2', 0.00, 4.00, 8, 8),
+    (9, 'Setor A - Corredor 3', -25.00, -18.00, 9, 9),
+    (10, 'Setor B - Corredor 4', 0.00, 4.00, 10, 10),
+    (11, 'Setor C - Corredor 5', -25.00, -18.00, 11, 11),
+    (12, 'Setor D - Corredor 6', 0.00, 4.00, 12, 12),
+    (13, 'Setor A - Corredor 1', -25.00, -18.00, 13, 13),
+    (14, 'Setor B - Corredor 2', 0.00, 4.00, 14, 14),
+    (15, 'Setor C - Corredor 3', -25.00, -18.00, 15, 15),
+    (16, 'Setor D - Corredor 4', 0.00, 4.00, 16, 16),
+    (17, 'Setor A - Corredor 5', -25.00, -18.00, 17, 17),
+    (18, 'Setor B - Corredor 6', 0.00, 4.00, 18, 18),
+    (19, 'Setor C - Corredor 1', -25.00, -18.00, 19, 19),
+    (20, 'Setor D - Corredor 2', 0.00, 4.00, 20, 20),
+    (21, 'Setor A - Corredor 3', -25.00, -18.00, 21, 21),
+    (22, 'Setor B - Corredor 4', 0.00, 4.00, 22, 22),
+    (23, 'Setor C - Corredor 5', -25.00, -18.00, 23, 23),
+    (24, 'Setor D - Corredor 6', 0.00, 4.00, 24, 24),
+    (25, 'Setor A - Corredor 1', -25.00, -18.00, 25, 25),
+    (26, 'Setor B - Corredor 2', 0.00, 4.00, 26, 26),
+    (27, 'Setor C - Corredor 3', -25.00, -18.00, 27, 27),
+    (28, 'Setor D - Corredor 4', 0.00, 4.00, 28, 28),
+    (29, 'Setor A - Corredor 5', -25.00, -18.00, 29, 29),
+    (30, 'Setor B - Corredor 6', 0.00, 4.00, 30, 30),
+    (31, 'Setor C - Corredor 1', -25.00, -18.00, 31, 31),
+    (32, 'Setor D - Corredor 2', 0.00, 4.00, 32, 32),
+    (33, 'Setor A - Corredor 3', -25.00, -18.00, 33, 33),
+    (34, 'Setor B - Corredor 4', 0.00, 4.00, 34, 34),
+    (35, 'Setor C - Corredor 5', -25.00, -18.00, 35, 35),
+    (36, 'Setor D - Corredor 6', 0.00, 4.00, 36, 36),
+    (37, 'Setor A - Corredor 1', -25.00, -18.00, 37, 37),
+    (38, 'Setor B - Corredor 2', 0.00, 4.00, 38, 38),
+    (39, 'Setor C - Corredor 3', -25.00, -18.00, 39, 39),
+    (40, 'Setor D - Corredor 4', 0.00, 4.00, 40, 40),
+    (41, 'Setor A - Corredor 5', -25.00, -18.00, 41, 41),
+    (42, 'Setor B - Corredor 6', 0.00, 4.00, 42, 42),
+    (43, 'Setor C - Corredor 1', -25.00, -18.00, 43, 43),
+    (44, 'Setor D - Corredor 2', 0.00, 4.00, 44, 44),
+    (45, 'Setor A - Corredor 3', -25.00, -18.00, 45, 45);
 
-INSERT INTO tb_lote_camara_frigorifica (cod_lote, cod_camara_frigorifica)
-VALUES (1, 1), (2, 2), (3, 1), (4, 1), (5, 3), (6, 4),
-       (7, 7), (8, 8), (9, 9), (10, 10), (11, 11), (12, 12);
+-- =============================
+-- 9. LOTES E VÍNCULOS COM CÂMARAS — MESMOS IDs DO LEGADO
+-- =============================
+INSERT INTO tb_lote (id, codigo_lote, cod_categoria, data_fabricacao, data_validade, status) VALUES
+    (1, 'LT-2026-0001', 1, CURRENT_DATE - 2, CURRENT_DATE + 178, 'ATIVO'),
+    (2, 'LT-2026-0002', 2, CURRENT_DATE - 3, CURRENT_DATE + 4, 'ATIVO'),
+    (3, 'LT-2026-0003', 3, CURRENT_DATE - 4, CURRENT_DATE + 176, 'VENDIDO'),
+    (4, 'LT-2026-0004', 4, CURRENT_DATE - 5, CURRENT_DATE + 2, 'ATIVO'),
+    (5, 'LT-2026-0005', 5, CURRENT_DATE - 6, CURRENT_DATE + 174, 'EXPEDIDO'),
+    (6, 'LT-2026-0006', 6, CURRENT_DATE - 7, CURRENT_DATE + 0, 'ATIVO'),
+    (7, 'LT-2026-0007', 7, CURRENT_DATE - 8, CURRENT_DATE + 172, 'BLOQUEADO'),
+    (8, 'LT-2026-0008', 8, CURRENT_DATE - 9, CURRENT_DATE - 2, 'ATIVO'),
+    (9, 'LT-2026-0009', 9, CURRENT_DATE - 10, CURRENT_DATE + 170, 'ATIVO'),
+    (10, 'LT-2026-0010', 10, CURRENT_DATE - 11, CURRENT_DATE - 4, 'VENDIDO'),
+    (11, 'LT-2026-0011', 11, CURRENT_DATE - 12, CURRENT_DATE + 168, 'ATIVO'),
+    (12, 'LT-2026-0012', 12, CURRENT_DATE - 13, CURRENT_DATE - 6, 'EXPEDIDO'),
+    (13, 'LT-2026-0013', 13, CURRENT_DATE - 14, CURRENT_DATE + 166, 'ATIVO'),
+    (14, 'LT-2026-0014', 14, CURRENT_DATE - 15, CURRENT_DATE - 8, 'BLOQUEADO'),
+    (15, 'LT-2026-0015', 15, CURRENT_DATE - 16, CURRENT_DATE + 164, 'ATIVO'),
+    (16, 'LT-2026-0016', 16, CURRENT_DATE - 17, CURRENT_DATE - 10, 'ATIVO'),
+    (17, 'LT-2026-0017', 17, CURRENT_DATE - 18, CURRENT_DATE + 162, 'VENDIDO'),
+    (18, 'LT-2026-0018', 18, CURRENT_DATE - 19, CURRENT_DATE - 12, 'ATIVO'),
+    (19, 'LT-2026-0019', 19, CURRENT_DATE - 20, CURRENT_DATE + 160, 'EXPEDIDO'),
+    (20, 'LT-2026-0020', 20, CURRENT_DATE - 21, CURRENT_DATE - 14, 'ATIVO'),
+    (21, 'LT-2026-0021', 21, CURRENT_DATE - 22, CURRENT_DATE + 158, 'BLOQUEADO'),
+    (22, 'LT-2026-0022', 22, CURRENT_DATE - 23, CURRENT_DATE - 16, 'ATIVO'),
+    (23, 'LT-2026-0023', 23, CURRENT_DATE - 24, CURRENT_DATE + 156, 'ATIVO'),
+    (24, 'LT-2026-0024', 24, CURRENT_DATE - 25, CURRENT_DATE - 18, 'VENDIDO'),
+    (25, 'LT-2026-0025', 25, CURRENT_DATE - 26, CURRENT_DATE + 154, 'ATIVO'),
+    (26, 'LT-2026-0026', 26, CURRENT_DATE - 27, CURRENT_DATE - 20, 'EXPEDIDO'),
+    (27, 'LT-2026-0027', 27, CURRENT_DATE - 28, CURRENT_DATE + 152, 'ATIVO'),
+    (28, 'LT-2026-0028', 28, CURRENT_DATE - 29, CURRENT_DATE - 22, 'BLOQUEADO'),
+    (29, 'LT-2026-0029', 29, CURRENT_DATE - 30, CURRENT_DATE + 150, 'ATIVO'),
+    (30, 'LT-2026-0030', 30, CURRENT_DATE - 1, CURRENT_DATE + 6, 'ATIVO'),
+    (31, 'LT-2026-0031', 31, CURRENT_DATE - 2, CURRENT_DATE + 178, 'VENDIDO'),
+    (32, 'LT-2026-0032', 32, CURRENT_DATE - 3, CURRENT_DATE + 4, 'ATIVO'),
+    (33, 'LT-2026-0033', 33, CURRENT_DATE - 4, CURRENT_DATE + 176, 'EXPEDIDO'),
+    (34, 'LT-2026-0034', 34, CURRENT_DATE - 5, CURRENT_DATE + 2, 'ATIVO'),
+    (35, 'LT-2026-0035', 35, CURRENT_DATE - 6, CURRENT_DATE + 174, 'BLOQUEADO'),
+    (36, 'LT-2026-0036', 36, CURRENT_DATE - 7, CURRENT_DATE + 0, 'ATIVO'),
+    (37, 'LT-2026-0037', 37, CURRENT_DATE - 8, CURRENT_DATE + 172, 'ATIVO'),
+    (38, 'LT-2026-0038', 38, CURRENT_DATE - 9, CURRENT_DATE - 2, 'VENDIDO'),
+    (39, 'LT-2026-0039', 39, CURRENT_DATE - 10, CURRENT_DATE + 170, 'ATIVO'),
+    (40, 'LT-2026-0040', 40, CURRENT_DATE - 11, CURRENT_DATE - 4, 'EXPEDIDO'),
+    (41, 'LT-2026-0041', 41, CURRENT_DATE - 12, CURRENT_DATE + 168, 'ATIVO'),
+    (42, 'LT-2026-0042', 42, CURRENT_DATE - 13, CURRENT_DATE - 6, 'BLOQUEADO'),
+    (43, 'LT-2026-0043', 43, CURRENT_DATE - 14, CURRENT_DATE + 166, 'ATIVO'),
+    (44, 'LT-2026-0044', 44, CURRENT_DATE - 15, CURRENT_DATE - 8, 'ATIVO'),
+    (45, 'LT-2026-0045', 45, CURRENT_DATE - 16, CURRENT_DATE + 164, 'VENDIDO');
 
-WITH lotes AS (
-    SELECT
-        gs,
-        ((gs - 1) % 6) + 1 AS cod_categoria,
-        ((gs - 1) / 6) + 1 AS sequencia_categoria,
-        CURRENT_DATE - ((gs % 5) + 1) AS data_fabricacao
-    FROM generate_series(1, 120) AS gs
-), inseridos AS (
-    INSERT INTO tb_lote
-        (codigo_lote, cod_categoria, data_fabricacao, data_validade, status)
-    SELECT
-        'LOTE-2026-' || LPAD((1000 + lotes.gs)::TEXT, 5, '0'),
-        lotes.cod_categoria,
-        lotes.data_fabricacao,
-        lotes.data_fabricacao + CASE lotes.cod_categoria
-            WHEN 1 THEN 30 WHEN 2 THEN 30 WHEN 3 THEN 21
-            WHEN 4 THEN 14 WHEN 5 THEN 7 ELSE 365
-        END,
-        'ATIVO'
-    FROM lotes
-    RETURNING id, codigo_lote, cod_categoria
-)
-INSERT INTO tb_lote_camara_frigorifica
-    (cod_lote, cod_camara_frigorifica, data_entrada)
-SELECT
-    inseridos.id,
-    (
-        SELECT cam.id
-        FROM tb_camara_frigorifica cam
-        JOIN tb_categoria categoria ON categoria.id = inseridos.cod_categoria
-        WHERE cam.temperatura_min <= categoria.temperatura_min
-          AND cam.temperatura_max >= categoria.temperatura_max
-        ORDER BY cam.id
-        OFFSET ((lotes.sequencia_categoria - 1) % (
-            SELECT COUNT(*)
-            FROM tb_camara_frigorifica cam_disponivel
-            JOIN tb_categoria categoria_disponivel
-                ON categoria_disponivel.id = inseridos.cod_categoria
-            WHERE cam_disponivel.temperatura_min <= categoria_disponivel.temperatura_min
-              AND cam_disponivel.temperatura_max >= categoria_disponivel.temperatura_max
-        ))
-        LIMIT 1
-    ),
-    CURRENT_TIMESTAMP - ((lotes.gs % 5) * INTERVAL '1 day')
-FROM inseridos
-JOIN lotes
-    ON inseridos.codigo_lote = 'LOTE-2026-' || LPAD((1000 + lotes.gs)::TEXT, 5, '0');
+INSERT INTO tb_lote_camara_frigorifica (id, cod_lote, cod_camara_frigorifica, data_entrada, data_saida) VALUES
+    (1, 1, 1, CURRENT_TIMESTAMP - INTERVAL '2 days', NULL),
+    (2, 2, 2, CURRENT_TIMESTAMP - INTERVAL '3 days', NULL),
+    (3, 3, 3, CURRENT_TIMESTAMP - INTERVAL '4 days', NULL),
+    (4, 4, 4, CURRENT_TIMESTAMP - INTERVAL '5 days', NULL),
+    (5, 5, 5, CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days'),
+    (6, 6, 6, CURRENT_TIMESTAMP - INTERVAL '7 days', NULL),
+    (7, 7, 7, CURRENT_TIMESTAMP - INTERVAL '8 days', NULL),
+    (8, 8, 8, CURRENT_TIMESTAMP - INTERVAL '9 days', NULL),
+    (9, 9, 9, CURRENT_TIMESTAMP - INTERVAL '10 days', NULL),
+    (10, 10, 10, CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days'),
+    (11, 11, 11, CURRENT_TIMESTAMP - INTERVAL '12 days', NULL),
+    (12, 12, 12, CURRENT_TIMESTAMP - INTERVAL '13 days', NULL),
+    (13, 13, 13, CURRENT_TIMESTAMP - INTERVAL '14 days', NULL),
+    (14, 14, 14, CURRENT_TIMESTAMP - INTERVAL '15 days', NULL),
+    (15, 15, 15, CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days'),
+    (16, 16, 16, CURRENT_TIMESTAMP - INTERVAL '17 days', NULL),
+    (17, 17, 17, CURRENT_TIMESTAMP - INTERVAL '18 days', NULL),
+    (18, 18, 18, CURRENT_TIMESTAMP - INTERVAL '19 days', NULL),
+    (19, 19, 19, CURRENT_TIMESTAMP - INTERVAL '20 days', NULL),
+    (20, 20, 20, CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days'),
+    (21, 21, 21, CURRENT_TIMESTAMP - INTERVAL '2 days', NULL),
+    (22, 22, 22, CURRENT_TIMESTAMP - INTERVAL '3 days', NULL),
+    (23, 23, 23, CURRENT_TIMESTAMP - INTERVAL '4 days', NULL),
+    (24, 24, 24, CURRENT_TIMESTAMP - INTERVAL '5 days', NULL),
+    (25, 25, 25, CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days'),
+    (26, 26, 26, CURRENT_TIMESTAMP - INTERVAL '7 days', NULL),
+    (27, 27, 27, CURRENT_TIMESTAMP - INTERVAL '8 days', NULL),
+    (28, 28, 28, CURRENT_TIMESTAMP - INTERVAL '9 days', NULL),
+    (29, 29, 29, CURRENT_TIMESTAMP - INTERVAL '10 days', NULL),
+    (30, 30, 30, CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days'),
+    (31, 31, 31, CURRENT_TIMESTAMP - INTERVAL '12 days', NULL),
+    (32, 32, 32, CURRENT_TIMESTAMP - INTERVAL '13 days', NULL),
+    (33, 33, 33, CURRENT_TIMESTAMP - INTERVAL '14 days', NULL),
+    (34, 34, 34, CURRENT_TIMESTAMP - INTERVAL '15 days', NULL),
+    (35, 35, 35, CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days'),
+    (36, 36, 36, CURRENT_TIMESTAMP - INTERVAL '17 days', NULL),
+    (37, 37, 37, CURRENT_TIMESTAMP - INTERVAL '18 days', NULL),
+    (38, 38, 38, CURRENT_TIMESTAMP - INTERVAL '19 days', NULL),
+    (39, 39, 39, CURRENT_TIMESTAMP - INTERVAL '20 days', NULL),
+    (40, 40, 40, CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days'),
+    (41, 41, 41, CURRENT_TIMESTAMP - INTERVAL '2 days', NULL),
+    (42, 42, 42, CURRENT_TIMESTAMP - INTERVAL '3 days', NULL),
+    (43, 43, 43, CURRENT_TIMESTAMP - INTERVAL '4 days', NULL),
+    (44, 44, 44, CURRENT_TIMESTAMP - INTERVAL '5 days', NULL),
+    (45, 45, 45, CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days');
+
+-- Ajusta sequencias depois dos IDs explicitos (incluindo contas locais).
+SELECT setval(pg_get_serial_sequence('tb_cd', 'id'), (SELECT MAX(id) FROM tb_cd));
+SELECT setval(pg_get_serial_sequence('tb_endereco', 'id'), (SELECT MAX(id) FROM tb_endereco));
+SELECT setval(pg_get_serial_sequence('tb_usuario', 'id'), (SELECT MAX(id) FROM tb_usuario));
+SELECT setval(pg_get_serial_sequence('tb_termometro', 'id'), (SELECT MAX(id) FROM tb_termometro));
+SELECT setval(pg_get_serial_sequence('tb_categoria', 'id'), (SELECT MAX(id) FROM tb_categoria));
+SELECT setval(pg_get_serial_sequence('tb_camara_frigorifica', 'id'), (SELECT MAX(id) FROM tb_camara_frigorifica));
+SELECT setval(pg_get_serial_sequence('tb_lote', 'id'), (SELECT MAX(id) FROM tb_lote));
+SELECT setval(pg_get_serial_sequence('tb_lote_camara_frigorifica', 'id'), (SELECT MAX(id) FROM tb_lote_camara_frigorifica));
 
 -- =============================
 -- 10. LEITURAS DE TEMPERATURA
@@ -383,11 +570,21 @@ ORDER BY 3, 1;
 
 INSERT INTO tb_leitura_temperatura
     (cod_termometro, temperatura, data_hora)
-VALUES
+SELECT exemplo.cod_termometro, exemplo.temperatura, exemplo.data_hora::TIMESTAMP
+FROM (VALUES
     (1, 4.80, '2026-09-02 08:00:00'),
     (2, 6.80, '2026-09-02 08:30:00'),
     (7, 5.00, '2026-09-02 09:00:00'),
-    (10, -8.00, '2026-09-02 09:30:00');
+    (10, -8.00, '2026-09-02 09:30:00')
+) AS exemplo(cod_termometro, temperatura, data_hora)
+JOIN tb_camara_frigorifica cam ON cam.cod_termometro = exemplo.cod_termometro
+-- As triggers exigem lote ativo ainda presente para gerar um alerta.
+WHERE EXISTS (
+    SELECT 1 FROM tb_lote_camara_frigorifica vinculo
+    JOIN tb_lote lote ON lote.id = vinculo.cod_lote
+    WHERE vinculo.cod_camara_frigorifica = cam.id
+      AND vinculo.data_saida IS NULL AND lote.status = 'ATIVO'
+);
 
 INSERT INTO tb_leitura_temperatura (cod_termometro, temperatura, data_hora)
 SELECT
@@ -401,6 +598,12 @@ SELECT
     TIMESTAMP '2026-09-03 08:00:00' + (cam.id * INTERVAL '5 minutes')
 FROM tb_camara_frigorifica cam
 WHERE cam.cod_termometro NOT IN (1, 2, 7, 10)
+  AND EXISTS (
+      SELECT 1 FROM tb_lote_camara_frigorifica vinculo
+      JOIN tb_lote lote ON lote.id = vinculo.cod_lote
+      WHERE vinculo.cod_camara_frigorifica = cam.id
+        AND vinculo.data_saida IS NULL AND lote.status = 'ATIVO'
+  )
 ORDER BY cam.id;
 
 -- Reconhece alertas com operadores do CD correspondente.
@@ -493,7 +696,7 @@ JOIN tb_admin_cd admin_cd
     ON admin_cd.cod_cd = cd.id
 JOIN tb_usuario admin
     ON admin.id = admin_cd.cod_admin
-   AND admin.username = 'admin' || LPAD(cd.id::TEXT, 3, '0')
+   AND admin.nivel_acesso = 'ADMIN'
 JOIN (VALUES
         (1, '6043ddebb2d117e47604510a29612a73c3af24122fbc0d8ae458e6f89f27361c'),
         (2, 'ff86f155e89ec4037ff46380d51d7d00d7e2e5593e3f8a27982fd34f56f2eba0'),
@@ -524,15 +727,15 @@ INSERT INTO tb_relatorio (
     cod_usuario_gerador, cod_cd, hash_conteudo, periodo_inicio, periodo_fim, status, conteudo
 )
 VALUES
-((SELECT id FROM tb_usuario WHERE username = 'admin001'), 1,
+((SELECT id FROM tb_usuario WHERE username = 'usuario1'), 1,
  'e59d3e70d8e55ce6fc36361645a3708294c6c4e5971a1ea0cf7844a4c7d6d862',
  '2026-08-01', '2026-08-31', 'GERADO',
  'Relatorio operacional do periodo de agosto de 2026 - usuario 2.'),
-((SELECT id FROM tb_usuario WHERE username = 'admin002'), 2,
+((SELECT id FROM tb_usuario WHERE username = 'usuario2'), 2,
  '998be91f97fd94a6e41e184ece055dd2a3d30fa1a36beda81784fde6ce0d259c',
  '2026-08-01', '2026-08-31', 'ASSINADO',
  'Relatorio operacional do periodo de agosto de 2026 - usuario 3.'),
-((SELECT id FROM tb_usuario WHERE username = 'admin003'), 3,
+((SELECT id FROM tb_usuario WHERE username = 'usuario3'), 3,
  '13c895e9b2a36953fe26ce97179eb2297eecfffa5a5205d0f2912cd6d41c0a9a',
  '2026-07-01', '2026-07-31', 'ARQUIVADO',
  'Relatorio operacional do periodo de julho de 2026 - usuario 4.');
@@ -590,11 +793,11 @@ INSERT INTO tb_log_acesso (
 )
 SELECT usuario.id, eventos.sucesso, eventos.ip::INET, 'Mozilla/5.0', eventos.motivo
 FROM (VALUES
-    ('operador002', TRUE, '192.168.1.10', NULL),
-    ('operador032', TRUE, '192.168.1.11', NULL),
-    ('operador033', TRUE, '192.168.1.12', NULL),
-    ('operador052', TRUE, '192.168.1.13', NULL),
-    ('operador042', FALSE, '192.168.1.14', 'Senha incorreta')
+    ('usuario21', TRUE, '192.168.1.10', NULL),
+    ('usuario22', TRUE, '192.168.1.11', NULL),
+    ('usuario23', TRUE, '192.168.1.12', NULL),
+    ('usuario24', TRUE, '192.168.1.13', NULL),
+    ('usuario25', FALSE, '192.168.1.14', 'Senha incorreta')
 ) AS eventos(username, sucesso, ip, motivo)
 JOIN tb_usuario usuario ON usuario.username = eventos.username;
 
@@ -617,7 +820,7 @@ SELECT
     END,
     CURRENT_TIMESTAMP - (gs * INTERVAL '4 hours')
 FROM generate_series(1, 100) gs
-JOIN tb_usuario usuario ON usuario.username = 'operador' || LPAD(gs::TEXT, 3, '0');
+JOIN tb_usuario usuario ON usuario.username = 'usuario' || (21 + ((gs - 1) % 25))::TEXT;
 
 INSERT INTO tb_log_acesso
     (cod_usuario, tentativa_sucesso, ip_origem, user_agent, motivo_falha, data_hora)
@@ -648,7 +851,7 @@ CROSS JOIN LATERAL (
     FROM tb_usuario
     WHERE nivel_acesso = 'OPERADOR'
     ORDER BY id
-    OFFSET ((serie.gs - 1) % 200)
+    OFFSET ((serie.gs - 1) % (SELECT COUNT(*) FROM tb_usuario WHERE nivel_acesso = 'OPERADOR'))
     LIMIT 1
 ) AS operador
 ORDER BY serie.gs;

@@ -16,6 +16,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import psycopg
@@ -39,7 +40,8 @@ POSTGRES_CONFIG = {
     "sslmode": os.getenv("POSTGRES_SSLMODE", "require"),
 }
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-WORKER_USER_ID = int(os.getenv("WORKER_USER_ID", "1"))
+# ID da conta tecnica no dataload; IDs 1..50 pertencem ao legado de teste.
+WORKER_USER_ID = int(os.getenv("WORKER_USER_ID", "1000001"))
 TEMPERATURE_STREAM = os.getenv(
     "REDIS_TEMPERATURE_STREAM", "skadi:leituras:temperatura"
 )
@@ -50,9 +52,24 @@ CONSUMER_NAME = os.getenv("REDIS_CONSUMER_NAME", "worker-1")
 ESCALATION_ZSET = os.getenv("REDIS_ESCALATION_ZSET", "skadi:escalonamentos")
 PUSH_STREAM = os.getenv("REDIS_PUSH_STREAM", "skadi:notificacoes:push")
 POSTGRES_ALERT_CHANNEL = os.getenv("POSTGRES_ALERT_CHANNEL", "novo_alerta")
-BLOCK_MS = int(os.getenv("WORKER_BLOCK_MS", "5000"))
+# O socket precisa aguardar mais que o bloqueio do XREADGROUP. Endpoints
+# gerenciados (como Upstash) podem encerrar leituras longas antes disso.
+BLOCK_MS = int(os.getenv("WORKER_BLOCK_MS", "1000"))
+REDIS_SOCKET_TIMEOUT = max(
+    float(os.getenv("REDIS_SOCKET_TIMEOUT", "10")),
+    (BLOCK_MS / 1000) + 5,
+)
 BATCH_SIZE = int(os.getenv("WORKER_BATCH_SIZE", "100"))
 SCHEDULER_POLL_SECONDS = float(os.getenv("SCHEDULER_POLL_SECONDS", "1"))
+
+
+def connection_url(redis_url: str) -> str:
+    """Ativa TLS quando a configuração aponta para um Redis Upstash."""
+
+    parsed = urlparse(redis_url)
+    if parsed.scheme == "redis" and (parsed.hostname or "").endswith(".upstash.io"):
+        return f"rediss://{redis_url.split('://', 1)[1]}"
+    return redis_url
 
 
 def parse_timestamp(value: Any) -> datetime:
@@ -260,7 +277,13 @@ class PostgresRepository:
 
 class RedisWorker:
     def __init__(self) -> None:
-        self.redis = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+        self.redis = redis.Redis.from_url(
+            connection_url(REDIS_URL),
+            decode_responses=True,
+            socket_connect_timeout=10,
+            socket_timeout=REDIS_SOCKET_TIMEOUT,
+            health_check_interval=30,
+        )
         self.repository = PostgresRepository()
         self.stop_event = threading.Event()
 

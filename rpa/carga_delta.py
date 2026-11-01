@@ -288,7 +288,7 @@ def carregar_usuarios(
     for registro in registros:
         validar_usuario(registro)
 
-    return executar_upsert(
+    quantidade = executar_upsert(
         destino,
         """
         INSERT INTO tb_usuario (
@@ -315,10 +315,26 @@ def carregar_usuarios(
             registro["email"],
             registro["senha"],
             registro["nivel_acesso"],
-            registro["id_cd"],
+            None if registro["nivel_acesso"] == "ADMIN" else registro["id_cd"],
             registro["cod_gestor"],
         ),
     )
+
+    # No modelo normalizado, ADMIN se relaciona com CDs por tb_admin_cd.
+    # Mantem os vinculos adicionais existentes: nao ha exclusao na carga delta.
+    with destino.cursor() as cursor:
+        for registro in registros:
+            if registro["nivel_acesso"] == "ADMIN":
+                cursor.execute(
+                    """
+                    INSERT INTO tb_admin_cd (cod_admin, cod_cd)
+                    VALUES (%s, %s)
+                    ON CONFLICT (cod_admin, cod_cd) DO NOTHING
+                    """,
+                    (registro["id_usuario"], registro["id_cd"]),
+                )
+
+    return quantidade
 
 
 def carregar_categorias(
