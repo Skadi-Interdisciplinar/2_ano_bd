@@ -28,6 +28,8 @@ Os valores controlados são normalizados para maiúsculo e validados nos domíni
 
 Para usuários, as regras do banco são respeitadas diretamente: `SUPER_ADMIN`, `ADMIN` e `GESTOR` não podem possuir `cod_gestor`, e `OPERADOR` precisa possuir um gestor válido no mesmo CD. Dados fora dessas regras devem ser corrigidos no legado antes da nova execução.
 
+Se um e-mail do legado já pertencer a outro ID no destino, o RPA registra um aviso e ignora somente esse usuário, sem tentar reassociar IDs nem interromper a sincronização das demais tabelas. E-mails repetidos entre usuários do próprio lote legado também fazem com que os registros envolvidos sejam ignorados. Para sincronizar esses usuários depois, corrija a duplicidade/alinhamento nos bancos e atualize `data_atualizacao` do registro no legado; assim ele volta a entrar em uma carga delta. Confira os avisos do workflow: uma execução concluída pode ter usuários ignorados por esse motivo.
+
 ## Pré-requisitos
 
 No legado, as tabelas sincronizadas devem ter `data_atualizacao` preenchida em inserções e atualizações. O modelo esperado inclui:

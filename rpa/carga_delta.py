@@ -290,6 +290,61 @@ def carregar_usuarios(
     for registro in registros:
         validar_usuario(registro)
 
+    # Uma divergência de identidade entre os bancos não pode ser resolvida
+    # assumindo que dois IDs diferentes representam a mesma pessoa. Pré-filtra
+    # colisões de e-mail para que uma linha inválida não aborte toda a carga.
+    emails_origem: dict[str, list[int]] = {}
+    for registro in registros:
+        emails_origem.setdefault(registro["email"], []).append(registro["id_usuario"])
+
+    ids_email_duplicado_origem = {
+        id_usuario
+        for ids in emails_origem.values()
+        if len(ids) > 1
+        for id_usuario in ids
+    }
+    for ids in emails_origem.values():
+        if len(ids) > 1:
+            LOGGER.warning(
+                "Usuários legados ids=%s ignorados: o mesmo e-mail aparece em mais de um registro.",
+                ids,
+            )
+
+    ids_email_destino: dict[str, int] = {}
+    if registros:
+        with destino.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, email FROM tb_usuario WHERE email = ANY(%s)",
+                ([registro["email"] for registro in registros],),
+            )
+            ids_email_destino = {email: id_usuario for id_usuario, email in cursor.fetchall()}
+
+    registros_validos: list[dict] = []
+    for registro in registros:
+        id_usuario = registro["id_usuario"]
+        email = registro["email"]
+        if id_usuario in ids_email_duplicado_origem:
+            continue
+
+        id_email_existente = ids_email_destino.get(email)
+        if id_email_existente is not None and id_email_existente != id_usuario:
+            LOGGER.warning(
+                "Usuário legado id=%s ignorado: e-mail já pertence ao usuário id=%s no destino. "
+                "Alinhe os registros nos bancos e atualize data_atualizacao no legado para tentar novamente.",
+                id_usuario,
+                id_email_existente,
+            )
+            continue
+
+        registros_validos.append(registro)
+
+    quantidade_ignorados = len(registros) - len(registros_validos)
+    if quantidade_ignorados:
+        LOGGER.warning(
+            "%s usuário(s) ignorado(s) por conflito de e-mail; os demais registros da carga continuarão.",
+            quantidade_ignorados,
+        )
+
     quantidade = executar_upsert(
         destino,
         """
@@ -308,7 +363,7 @@ def carregar_usuarios(
             cod_cd = EXCLUDED.cod_cd,
             cod_gestor = EXCLUDED.cod_gestor
         """,
-        registros,
+        registros_validos,
         lambda registro: (
             registro["id_usuario"],
             registro["nome"],
@@ -325,7 +380,7 @@ def carregar_usuarios(
     # No modelo normalizado, ADMIN se relaciona com CDs por tb_admin_cd.
     # Mantem os vinculos adicionais existentes: nao ha exclusao na carga delta.
     with destino.cursor() as cursor:
-        for registro in registros:
+        for registro in registros_validos:
             if registro["nivel_acesso"] == "ADMIN":
                 cursor.execute(
                     """
