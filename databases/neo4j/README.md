@@ -97,11 +97,6 @@ Os caminhos e relacionamentos permanecem os mesmos. `TRABALHA_NO_CD` representa
 o cod_cd operacional do usuário; não representa os CDs administrados por ADMIN
 via tb_admin_cd. O traversal mantém a pergunta original, sem expandir esse escopo.
 
-O teste isolado carrega duas vezes, verifica ausência das propriedades antigas,
-obtém resultados positivos e testa que atendimentos RESOLVIDO não retornam.
-Ver [resultado](../postgresql/evidencias/validacao-requisitos.md) e
-[execução reproduzível](../../tests/README.md).
-
 ## 5. Estrutura do diretório
 
 ```text

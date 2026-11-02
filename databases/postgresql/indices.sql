@@ -1,6 +1,4 @@
--- Indices e consultas de observacao. Nao remove indices existentes.
--- A comparacao sem/com indices deve ser executada SOMENTE na base descartavel
--- pelo teste tests/validar_requisitos.py; planos reais ficam na evidencia gerada.
+-- Índices das consultas operacionais
 
 CREATE INDEX IF NOT EXISTS idx_leitura_termometro_data
 	ON tb_leitura_temperatura (cod_termometro, data_hora DESC, id DESC);
@@ -49,3 +47,18 @@ SELECT lc.cod_lote, lc.cod_camara_frigorifica
 FROM tb_lote_camara_frigorifica lc
 WHERE lc.cod_camara_frigorifica = 1
 	AND lc.data_saida IS NULL;
+
+-- Consulta 4: solicitações recentes de um usuário
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT ss.id, ss.status, ss.data_hora_abertura
+FROM tb_solicitacao_suporte ss
+WHERE ss.cod_usuario_solicitante = 21
+ORDER BY ss.data_hora_abertura DESC
+LIMIT 20;
+
+-- Consulta 5: solicitações atribuídas a um responsável por status
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT ss.id, ss.status, ss.data_hora_abertura
+FROM tb_solicitacao_suporte ss
+WHERE ss.cod_usuario_responsavel = 1000002
+	AND ss.status = 'EM_ATENDIMENTO';

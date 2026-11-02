@@ -2,7 +2,7 @@
 
 ## Recuperação testada em ambiente descartável
 
-Em 01/11/2026, o runner `tests/validar_requisitos.py` executou pg_dump custom e pg_restore com transação única em outro banco local. Comparou contagens de todas as tabelas públicas, nomes das views, quantidades de constraints, triggers e funções, além de sequências selecionadas e uma gravação com auditoria após a restauração. Resultados e hash do dump estão em [evidencias/validacao-requisitos.md](evidencias/validacao-requisitos.md) e no JSON vinculado.
+Em 01/11/2026, foi testada em ambiente descartável uma restauração com `pg_dump` no formato custom e `pg_restore` em outro banco local. A conferência incluiu contagens das tabelas públicas, nomes das views, constraints, triggers, funções, sequências selecionadas e uma gravação com auditoria após a restauração.
 
 São dados sintéticos em containers descartáveis. O teste usa `--no-owner --no-privileges` no mesmo servidor local; não comprova restauração de roles globais, grants, conectividade ou acessos em produção. Não foi feito backup nem alteração de banco real. Frequência, retenção, responsável, RPO e RTO continuam pendentes de definição operacional.
 
@@ -12,7 +12,7 @@ O backup lógico deve incluir todas as tabelas, dados, sequences, funções, tri
 
 O responsável operacional, frequência, retenção, perda máxima tolerável (RPO) e tempo máximo de recuperação (RTO) precisam ser definidos pela equipe. Este documento não comprova que existe agendamento ou recuperação automática. Antes de qualquer migração destrutiva, gerar e validar uma cópia. Para falhas entre cópias, a recuperação fica limitada ao último backup válido; recuperação para um instante específico depende de backups/WAL e dos recursos contratados no provedor.
 
-Instalar ferramentas cliente PostgreSQL compatíveis com o servidor. Usar `pg_dump` da mesma versão principal do servidor ou mais recente que o servidor; para restauração, preferir a mesma versão de ferramentas usada no dump e destino compatível. Preparar uma conta autorizada a ler todos os objetos necessários. RLS/permissões insuficientes não podem deixar dados de fora silenciosamente: conferir o resultado e os logs.
+Instalar ferramentas cliente PostgreSQL compatíveis com o servidor. Usar `pg_dump` da mesma versão principal do servidor ou mais recente que o servidor; para restauração, preferir a mesma versão de ferramentas usada no dump e destino compatível. Preparar uma conta autorizada a ler todos os objetos necessários e conferir os logs e o resultado do backup.
 
 Guardar credenciais fora dos comandos e do Git, usando o arquivo de senhas do PostgreSQL (`%APPDATA%\postgresql\pgpass.conf` no Windows) protegido por permissões do sistema. Informar nele host, porta, banco, usuário e senha reais. Não registrar senhas em logs. Configurar `PGSSLMODE` conforme a conexão aprovada e, se exigido, certificado CA.
 
@@ -56,4 +56,4 @@ if ($LASTEXITCODE -ne 0) { throw "Restauração falhou; não liberar o banco." }
 
 ## Teste periódico
 
-Executar esse fluxo em banco isolado na periodicidade definida pela equipe e após mudanças relevantes no schema. Uma cópia sem restauração testada não deve ser tratada como garantia de recuperação. O agendamento, retenção e testes reais ainda dependem de configuração operacional.
+Executar esse fluxo em banco isolado na periodicidade definida pela equipe e após mudanças relevantes no schema. Uma cópia sem restauração testada não deve ser tratada como garantia de recuperação.

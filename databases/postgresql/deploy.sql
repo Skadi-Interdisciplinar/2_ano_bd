@@ -1849,9 +1849,7 @@ FROM etapas_escalonamento
 ORDER BY cod_alerta, ordem_etapa;
 
 
--- Indices e consultas de observacao. Nao remove indices existentes.
--- A comparacao sem/com indices deve ser executada SOMENTE na base descartavel
--- pelo teste tests/validar_requisitos.py; planos reais ficam na evidencia gerada.
+-- Índices das consultas operacionais
 
 CREATE INDEX IF NOT EXISTS idx_leitura_termometro_data
 	ON tb_leitura_temperatura (cod_termometro, data_hora DESC, id DESC);
@@ -1900,7 +1898,6 @@ SELECT lc.cod_lote, lc.cod_camara_frigorifica
 FROM tb_lote_camara_frigorifica lc
 WHERE lc.cod_camara_frigorifica = 1
 	AND lc.data_saida IS NULL;
-
 
 -- ====================================================================
 -- ROLES E USUÁRIOS DO POSTGRESQL

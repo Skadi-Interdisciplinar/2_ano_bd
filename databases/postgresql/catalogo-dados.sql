@@ -1,5 +1,4 @@
 -- ====================================================================
--- CRIAÇÃO IDEMPOTENTE E COMPLEMENTAÇÃO DO CATÁLOGO
 -- Tabela centralizadora do Catálogo de Dados corporativo.
 -- Armazena o inventário de metadados, regras de negócio e mapeamento de segurança.
 -- Serve para auditoria, controle de LGPD e documentação técnica unificada.
